@@ -171,3 +171,45 @@ kubectl create deployment nginx --image=nginx
 Kubernetes Concepts – https://kubernetes.io/docs/concepts/
 
 Pod Overview- https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/
+
+### YAML and how to construct it?
+
+Starting with key-value pairs:
+
+```
+# All key-values pair(s) have space after the colon.
+fruit: apple
+liquid: water
+gas: oxygen
+number: one
+```
+
+Arrays
+
+```
+fruits:
+-  apple
+-  mango
+-  orange
+-  banana
+```
+So, all items in the array should follow the `-` hyphen in front and with equal number of spaces. Note, it is not restricted to have a only 2 or 3 spaces after hyphen but to keep it legible and need, 2 or 3 should work.
+
+
+Dictionaries/Map
+
+```
+fruit:
+   - - - - - - - - - - -
+- | Banana:             |
+  |   calories: 100g    |
+  |   fat: 20g          |   <----- Dictionaries
+  |   carbs: 20g        |
+- | Apple:              |
+  |   calories: 200g    |
+  |   fat: 2g           |
+  |   carbs: 100g       |
+   - - - - - - - - - - -
+```
+
+So, dictionaries are the properties of the `object` where in the above example, the object is banana and its properties are calories, fat, carbs. So, for dictionaries, you would need to give the key and place the objects below with a space.
