@@ -144,4 +144,30 @@ kubectl get nodes
 
 ### Docker Vs ContainerD
 
+What is important? Based on the learnings, it seems like the using K8s via Docker is discontinued from K8s v1.24. However, to our understanding, the underlying container runtime for Docker was also ContainerD but, we do not directly interact with it.
 
+So, what K8s community did, is to create two tools that can save time and be efficient to communicate with the K8s architecture:
+[1] `nerdctl` - Can be used widely and supports only ContainerD runtime.
+[2] `crictl` - Container Runtime Interface(cri) can be used too and supports most of the runtime including RKT, CRI-O, and ContainerD as well.
+
+### K8s Concepts
+
+- What are pods?
+
+Pods are the smallest `object` that we can create within the K8s cluster. It's basically K8s cluster(consider, it's a single node cluster) > Node > Pod > Containers. So, you create containers within the pod and scale the pods while you want to scale the containers.
+
+To create a pod from the command line, use the command:
+
+Create an NGINX Pod
+
+kubectl run nginx --image=nginx
+
+As of version 1.18, kubectl run (without any arguments such as --generator ) will create a pod instead of a deployment.
+
+To create a deployment using imperative command, use kubectl create:
+
+kubectl create deployment nginx --image=nginx
+
+Kubernetes Concepts – https://kubernetes.io/docs/concepts/
+
+Pod Overview- https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/
