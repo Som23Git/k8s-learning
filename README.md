@@ -264,4 +264,10 @@ kubectl describe pod <pod_name>
 ```
 
 
+Also, you can make use of the commands to quickly perform a dry-run.
 
+```
+kubectl run nginx --image=nginx --dry-run=client -o yaml 
+
+We can save its output to a YAML file and can rerun it quickly.
+```
