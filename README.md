@@ -213,3 +213,55 @@ fruit:
 ```
 
 So, dictionaries are the properties of the `object` where in the above example, the object is banana and its properties are calories, fat, carbs. So, for dictionaries, you would need to give the key and place the objects below with a space.
+
+### Pods with YAML
+
+Please note, when creating the pods, the K8s cluster should have `4 ROOT LEVEL properties`:
+
+```
+#pod-definition.yml
+
+apiVersion:
+kind:
+metadata:
+spec:
+```
+
+The above ones are the mandatory properties.
+
+Now, let's create an example `pod-definition.yml`
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: app-dev
+  labels: 
+    type: front-end
+    app: development
+spec:
+  containers:
+    - name: nginx-container
+      image: nginx
+```
+
+Use the below command to create the pod in the K8s cluster:
+
+```
+kubectl create -f pod-definition.yml
+```
+
+Use the below command to get the pods:
+
+```
+kubectl get pods
+```
+
+And,
+
+```
+kubectl describe pod <pod_name>
+```
+
+
+
