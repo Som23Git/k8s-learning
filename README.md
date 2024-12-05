@@ -269,5 +269,24 @@ Also, you can make use of the commands to quickly perform a dry-run.
 ```
 kubectl run nginx --image=nginx --dry-run=client -o yaml 
 
-We can save its output to a YAML file and can rerun it quickly.
+# Response/Output
+
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: nginx
+  name: nginx
+spec:
+  containers:
+  - image: nginx
+    name: nginx
+    resources: {}
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+status: {}
+
+We can save its output to a YAML file and can rerun it quickly like
+kubectl run nginx --image=nginx --dry-run=client -o yaml >> output.yaml
 ```
