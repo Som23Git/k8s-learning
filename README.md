@@ -290,3 +290,203 @@ status: {}
 We can save its output to a YAML file and can rerun it quickly like
 kubectl run nginx --image=nginx --dry-run=client -o yaml >> output.yaml
 ```
+
+### Replication Controller
+
+Replication controllers allows us to run multiple instances of single pod in the cluster.
+
+There are two terms:
+[1] Replication Controller - Older terminology
+[2] Replica Set - Latest
+
+Major difference between [1] and [2] is the:
+
+```
+selector:
+  matchLabels:
+    type: front-end
+```
+
+The `selectors` are NOT mandatory for the replication controllers but, it is mandatory for the replicasets.
+
+#### Scaling of Replicas
+
+Commands used here:
+```
+kubectl create -f replicaset-definition.yaml
+
+kubectl get replicaset
+
+kubectl delete <replicaset_name>     ---- This deletes all the pods underlying the replicasets
+
+kubectl replace -f replicaset-definition.yml
+
+kubectl scale --replicas=6 -f replicaset.yml
+```
+
+Below is the replicaset and replication controller yaml definition file:
+
+```
+# Replication Controller
+
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: app-rc
+  labels: 
+    type: replication_controller
+spec:
+  template:
+    metadata:
+      name: app-dev
+      labels: 
+        type: front-end
+        app: development
+    spec:
+      containers:
+        - name: nginx-container
+          image: nginx
+  replicas: 3
+
+# Response/Output:
+
+% kubectl get pods                                        
+NAME                   READY   STATUS              RESTARTS   AGE
+app-rc-9gbgl           0/1     ContainerCreating   0          3s
+app-rc-dlb6z           0/1     ContainerCreating   0          3s
+app-rc-mcv78           0/1     ContainerCreating   0          3s
+app-replicaset-cjfmx   1/1     Running             0          113s
+app-replicaset-fmzn6   1/1     Running             0          113s
+app-replicaset-j99z5   1/1     Running             0          113s
+
+% kubectl get pods
+NAME                   READY   STATUS              RESTARTS   AGE
+app-rc-9gbgl           0/1     ContainerCreating   0          6s
+app-rc-dlb6z           1/1     Running             0          6s
+app-rc-mcv78           1/1     Running             0          6s
+app-replicaset-cjfmx   1/1     Running             0          116s
+app-replicaset-fmzn6   1/1     Running             0          116s
+app-replicaset-j99z5   1/1     Running             0          116s
+
+% kubectl get pods
+NAME                   READY   STATUS    RESTARTS   AGE
+app-rc-9gbgl           1/1     Running   0          9s
+app-rc-dlb6z           1/1     Running   0          9s
+app-rc-mcv78           1/1     Running   0          9s
+app-replicaset-cjfmx   1/1     Running   0          119s
+app-replicaset-fmzn6   1/1     Running   0          119s
+app-replicaset-j99z5   1/1     Running   0          119s
+```
+
+
+```
+# Replicaset definition file
+
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: app-replicaset
+  labels: 
+    type: replication_set
+spec:
+  template:
+    metadata:
+      name: app-dev
+      labels: 
+        type: front-end
+        app: development
+    spec:
+      containers:
+        - name: nginx-container
+          image: nginx
+  replicas: 3
+  selector:
+    matchLabels:
+      type: front-end
+
+# Response/Output:
+
+% kubectl get pods
+NAME                   READY   STATUS              RESTARTS   AGE
+app-replicaset-cjfmx   1/1     Running             0          6s
+app-replicaset-fmzn6   0/1     ContainerCreating   0          6s
+app-replicaset-j99z5   0/1     ContainerCreating   0          6s
+
+% kubectl get pods
+NAME                   READY   STATUS    RESTARTS   AGE
+app-replicaset-cjfmx   1/1     Running   0          10s
+app-replicaset-fmzn6   1/1     Running   0          10s
+app-replicaset-j99z5   1/1     Running   0          10s
+```
+
+#### After Scaling:
+
+```
+% kubectl scale --replicas=6 -f replicaset-definition.yaml 
+replicaset.apps/app-replicaset scaled
+
+% kubectl get pods                                        
+NAME                   READY   STATUS              RESTARTS   AGE
+app-rc-9gbgl           1/1     Running             0          86s
+app-rc-dlb6z           1/1     Running             0          86s
+app-rc-mcv78           1/1     Running             0          86s
+app-replicaset-82b88   0/1     ContainerCreating   0          3s
+app-replicaset-b8djw   0/1     ContainerCreating   0          3s
+app-replicaset-cjfmx   1/1     Running             0          3m16s
+app-replicaset-d6tcb   1/1     Running             0          3s
+app-replicaset-fmzn6   1/1     Running             0          3m16s
+app-replicaset-j99z5   1/1     Running             0          3m16s
+
+% kubectl get pods
+NAME                   READY   STATUS    RESTARTS   AGE
+app-rc-9gbgl           1/1     Running   0          95s
+app-rc-dlb6z           1/1     Running   0          95s
+app-rc-mcv78           1/1     Running   0          95s
+app-replicaset-82b88   1/1     Running   0          12s
+app-replicaset-b8djw   1/1     Running   0          12s
+app-replicaset-cjfmx   1/1     Running   0          3m25s
+app-replicaset-d6tcb   1/1     Running   0          12s
+app-replicaset-fmzn6   1/1     Running   0          3m25s
+app-replicaset-j99z5   1/1     Running   0          3m25s
+```
+
+#### Delete replicaset
+
+```
+% kubectl get replicaset 
+NAME             DESIRED   CURRENT   READY   AGE
+app-replicaset   6         6         6       5m8s
+
+% kubectl delete replicaset app-replicaset
+replicaset.apps "app-replicaset" deleted
+
+% kubectl get pods                        
+NAME           READY   STATUS    RESTARTS   AGE
+app-rc-9gbgl   1/1     Running   0          3m57s
+app-rc-dlb6z   1/1     Running   0          3m57s
+app-rc-mcv78   1/1     Running   0          3m57s
+
+% kubectl get replicaset                  
+No resources found in default namespace.
+```
+
+As we mentioned above, deleting the `replicaset` will also delete the pods as you in the above output.
+
+#### Delete Replication Controller
+
+```
+% kubectl get replicationcontroller
+NAME     DESIRED   CURRENT   READY   AGE
+app-rc   3         3         3       9m27s
+
+% kubectl delete replicacontroller app-rc
+error: the server doesn't have a resource type "replicacontroller"
+
+% kubectl delete replicationcontroller app-rc
+replicationcontroller "app-rc" deleted
+
+% kubectl get pods
+No resources found in default namespace.
+```
+
+Now, we created pods via the `replicaset` and `replicationcontroller` and deleted them.
