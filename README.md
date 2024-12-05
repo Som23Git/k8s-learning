@@ -290,3 +290,88 @@ status: {}
 We can save its output to a YAML file and can rerun it quickly like
 kubectl run nginx --image=nginx --dry-run=client -o yaml >> output.yaml
 ```
+
+### Replication Controller
+
+Replication controllers allows us to run multiple instances of single pod in the cluster.
+
+There are two terms:
+[1] Replication Controller - Older terminology
+[2] Replica Set - Latest
+
+Major difference between [1] and [2] is the:
+
+```
+selector:
+  matchLabels:
+    type: front-end
+```
+
+The `selectors` are NOT mandatory for the replication controllers but, it is mandatory for the replicasets.
+
+#### Scaling of Replicas
+
+Commands used here:
+```
+kubectl create -f replicaset-definition.yaml
+
+kubectl get replicaset
+
+kubectl delete <replicaset_name>     ---- This deletes all the pods underlying the replicasets
+
+kubectl replace -f replicaset-definition.yml
+
+kubectl scale --replicas=6 -f replicaset.yml
+```
+
+Below is the replicaset and replication controller yaml definition file:
+
+```
+# Replication Controller
+
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: app-rc
+  labels: 
+    type: replication_controller
+spec:
+  template:
+    metadata:
+      name: app-dev
+      labels: 
+        type: front-end
+        app: development
+    spec:
+      containers:
+        - name: nginx-container
+          image: nginx
+  replicas: 3
+```
+
+
+```
+# Replicaset definition file
+
+apiVersion: apps/v1
+kind: Replicaset
+metadata:
+  name: app-replicaset
+  labels: 
+    type: replication_set
+spec:
+  template:
+    metadata:
+      name: app-dev
+      labels: 
+        type: front-end
+        app: development
+    spec:
+      containers:
+        - name: nginx-container
+          image: nginx
+  replicas: 3
+  selector:
+    matchLabels:
+      type: front-end
+```
