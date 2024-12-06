@@ -548,6 +548,28 @@ replicaset.apps/app-deployment-85489cdd5b   3         3         3       14s
 The deployment definition file, will automatically create the replicaset and the pods.
 
 ```
+# deployment-definition.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata: 
+  name: app-deployment
+spec:
+  template:
+    metadata:
+      name: pod-nginx
+      labels:
+        type: frontend
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+  replicas: 3
+  selector:
+    matchLabels:
+      type: frontend
+```
+
+```
 # This explain command will be very handy:
 $ kubectl explain deployments
 
