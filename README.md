@@ -520,6 +520,11 @@ $ kubectl explain replicationcontroller
 $ kubectl explain pod
 
 So, the above explain command will give us the details of what to use.
+
+# shorthand:
+
+$ kubectl get rs - For replicasets
+$ kubectl get deploy - For deployments
 ```
 
 ### Deployments
