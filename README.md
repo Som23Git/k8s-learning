@@ -490,3 +490,26 @@ No resources found in default namespace.
 ```
 
 Now, we created pods via the `replicaset` and `replicationcontroller` and deleted them.
+
+### Additional Commands:
+
+```
+
+$ kubectl get pods - Lists all pods in the namespace.  
+$ kubectl get replicaset - Lists all ReplicaSets in the namespace.  
+$ kubectl describe replicaset <replica-set-name> - Shows details of a specific ReplicaSet.  
+$ kubectl describe pod <pod-name> - Displays detailed information about a pod.  
+$ kubectl delete pod <pod-name> - Deletes a specific pod.  
+$ kubectl create -f <replicaset-definition-file>.yaml - Creates a ReplicaSet from a YAML file.  
+$ kubectl delete replicaset <replica-set-name> - Deletes a specific ReplicaSet.  
+$ kubectl edit replicaset <replica-set-name> - Modifies a ReplicaSet in real-time.  
+$ kubectl delete pods <pod-name-pattern> - Deletes pods matching a pattern.  
+$ kubectl scale replicaset <replica-set-name> --replicas=<number> - Scales the ReplicaSet to a specified number of replicas.  
+
+Then, to delete all the pod in one go:
+
+$ kubectl delete pods --all
+$ kubectl delete pods -l <label-key>=<label-value>
+$ kubectl delete pods --all -n <namespace>
+
+```
