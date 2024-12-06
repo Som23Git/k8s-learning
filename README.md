@@ -490,3 +490,94 @@ No resources found in default namespace.
 ```
 
 Now, we created pods via the `replicaset` and `replicationcontroller` and deleted them.
+
+#### Additional Commands:
+
+```
+
+$ kubectl get pods - Lists all pods in the namespace.  
+$ kubectl get replicaset - Lists all ReplicaSets in the namespace.  
+$ kubectl describe replicaset <replica-set-name> - Shows details of a specific ReplicaSet.  
+$ kubectl describe pod <pod-name> - Displays detailed information about a pod.  
+$ kubectl delete pod <pod-name> - Deletes a specific pod.  
+$ kubectl create -f <replicaset-definition-file>.yaml - Creates a ReplicaSet from a YAML file.  
+$ kubectl delete replicaset <replica-set-name> - Deletes a specific ReplicaSet.  
+$ kubectl edit replicaset <replica-set-name> - Modifies a ReplicaSet in real-time.  
+$ kubectl delete pods <pod-name-pattern> - Deletes pods matching a pattern.  
+$ kubectl scale replicaset <replica-set-name> --replicas=<number> - Scales the ReplicaSet to a specified number of replicas.  
+
+Then, to delete all the pod in one go:
+
+$ kubectl delete pods --all
+$ kubectl delete pods -l <label-key>=<label-value>
+$ kubectl delete pods --all -n <namespace>
+
+# Important, when in doubt, you can use:
+
+
+$ kubectl explain replicaset
+$ kubectl explain replicationcontroller
+$ kubectl explain pod
+
+So, the above explain command will give us the details of what to use.
+```
+
+### Deployments
+
+```
+$ kubectl create -f deployment-definition.yaml
+deployment.apps/app-deployment created
+```
+```
+$ kubctl get all 
+
+NAME                                  READY   STATUS    RESTARTS   AGE
+pod/app-deployment-85489cdd5b-7294b   1/1     Running   0          14s
+pod/app-deployment-85489cdd5b-926jt   1/1     Running   0          14s
+pod/app-deployment-85489cdd5b-wjq2b   1/1     Running   0          14s
+
+NAME                 TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   44d
+
+NAME                             READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/app-deployment   3/3     3            3           14s
+
+NAME                                        DESIRED   CURRENT   READY   AGE
+replicaset.apps/app-deployment-85489cdd5b   3         3         3       14s
+```
+The deployment definition file, will automatically create the replicaset and the pods.
+
+```
+# This explain command will be very handy:
+$ kubectl explain deployments
+
+GROUP:      apps
+KIND:       Deployment
+VERSION:    v1
+
+DESCRIPTION:
+    Deployment enables declarative updates for Pods and ReplicaSets.
+    
+FIELDS:
+  apiVersion    <string>
+    APIVersion defines the versioned schema of this representation of an object.
+    Servers should convert recognized schemas to the latest internal value, and
+    may reject unrecognized values. More info:
+    https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+
+  kind  <string>
+    Kind is a string value representing the REST resource this object
+    represents. Servers may infer this from the endpoint the client submits
+    requests to. Cannot be updated. In CamelCase. More info:
+    https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+
+  metadata      <ObjectMeta>
+    Standard object's metadata. More info:
+    https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+
+  spec  <DeploymentSpec>
+    Specification of the desired behavior of the Deployment.
+
+  status        <DeploymentStatus>
+    Most recently observed status of the Deployment.
+```
