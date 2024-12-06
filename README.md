@@ -491,7 +491,7 @@ No resources found in default namespace.
 
 Now, we created pods via the `replicaset` and `replicationcontroller` and deleted them.
 
-### Additional Commands:
+#### Additional Commands:
 
 ```
 
@@ -512,4 +512,12 @@ $ kubectl delete pods --all
 $ kubectl delete pods -l <label-key>=<label-value>
 $ kubectl delete pods --all -n <namespace>
 
+# Important, when in doubt, you can use:
+
+
+$ kubectl explain replicaset
+$ kubectl explain replicationcontroller
+$ kubectl explain pod
+
+So, the above explain command will give us the details of what to use.
 ```
