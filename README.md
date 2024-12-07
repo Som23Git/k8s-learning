@@ -668,6 +668,7 @@ REVISION  CHANGE-CAUSE
 1         <none>
 
 $ kubectl get all -o wide
+
 NAME                                        READY   STATUS    RESTARTS      AGE   IP            NODE       NOMINATED NODE   READINESS GATES
 pod/app-deployment-nginx-69976db885-5wn4v   1/1     Running   0             18m   10.244.0.34   minikube   <none>           <none>
 pod/app-deployment-nginx-69976db885-7q9qx   1/1     Running   0             18m   10.244.0.36   minikube   <none>           <none>
@@ -696,13 +697,14 @@ error: resource(s) were provided, but no name was specified
 $ kubectl set image deployment app-deployment-nginx nginx-container=nginx:1.18
 deployment.apps/app-deployment-nginx image updated
 
-$ kubectl rollout status deployment app-deployment-nginx                     
+$ kubectl rollout status deployment app-deployment-nginx  
 Waiting for deployment "app-deployment-nginx" rollout to finish: 0 of 3 updated replicas are available...
 Waiting for deployment "app-deployment-nginx" rollout to finish: 1 of 3 updated replicas are available...
 Waiting for deployment "app-deployment-nginx" rollout to finish: 2 of 3 updated replicas are available...
 deployment "app-deployment-nginx" successfully rolled out
 
-$ kubectl get all -o wide                                                     
+$ kubectl get all -o wide 
+
 NAME                                        READY   STATUS    RESTARTS      AGE   IP            NODE       NOMINATED NODE   READINESS GATES
 pod/app-deployment-nginx-7554f76c4c-6st79   1/1     Running   0             37s   10.244.0.42   minikube   <none>           <none>
 pod/app-deployment-nginx-7554f76c4c-gs9cn   1/1     Running   0             37s   10.244.0.40   minikube   <none>           <none>
@@ -726,7 +728,8 @@ replicaset.apps/hello-node-7b4b746b66             1         1         1       45
 $ kubectl rollout undo deployment app-deployment-nginx
 deployment.apps/app-deployment-nginx rolled back
 
-$ kubectl get all -o wide                             
+$ kubectl get all -o wide 
+
 NAME                                        READY   STATUS              RESTARTS      AGE   IP            NODE       NOMINATED NODE   READINESS GATES
 pod/app-deployment-nginx-69976db885-8qzx9   0/1     ContainerCreating   0             3s    <none>        minikube   <none>           <none>
 pod/app-deployment-nginx-69976db885-fsp52   0/1     ContainerCreating   0             3s    <none>        minikube   <none>           <none>
@@ -748,6 +751,7 @@ replicaset.apps/hello-node-7b4b746b66             1         1         1       45
 
 
 $ kubectl get all -o wide
+
 NAME                                        READY   STATUS              RESTARTS      AGE   IP            NODE       NOMINATED NODE   READINESS GATES
 pod/app-deployment-nginx-69976db885-8qzx9   0/1     ContainerCreating   0             9s    <none>        minikube   <none>           <none>
 pod/app-deployment-nginx-69976db885-fsp52   1/1     Running             0             9s    10.244.0.44   minikube   <none>           <none>
@@ -769,6 +773,7 @@ replicaset.apps/hello-node-7b4b746b66             1         1         1       45
 
 
 $ kubectl get all -o wide
+
 NAME                                        READY   STATUS    RESTARTS      AGE   IP            NODE       NOMINATED NODE   READINESS GATES
 pod/app-deployment-nginx-69976db885-8qzx9   1/1     Running   0             11s   10.244.0.45   minikube   <none>           <none>
 pod/app-deployment-nginx-69976db885-fsp52   1/1     Running   0             11s   10.244.0.44   minikube   <none>           <none>
@@ -790,6 +795,7 @@ replicaset.apps/hello-node-7b4b746b66             1         1         1       45
 
 
 $ kubectl get all -o wide
+
 NAME                                        READY   STATUS    RESTARTS      AGE   IP            NODE       NOMINATED NODE   READINESS GATES
 pod/app-deployment-nginx-69976db885-8qzx9   1/1     Running   0             14s   10.244.0.45   minikube   <none>           <none>
 pod/app-deployment-nginx-69976db885-fsp52   1/1     Running   0             14s   10.244.0.44   minikube   <none>           <none>
@@ -810,3 +816,95 @@ replicaset.apps/app-deployment-nginx-7554f76c4c   0         0         0       75
 replicaset.apps/hello-node-7b4b746b66             1         1         1       45d   hello-node        registry.k8s.io/e2e-test-images/agnhost:2.39   k8s-app=hello-node,pod-template-hash=7b4b746b66
 
 ```
+
+### Networking in K8s
+
+```
+$ kubectl get all -o wide
+
+NAME                                        READY   STATUS    RESTARTS      AGE   IP            NODE       NOMINATED NODE   READINESS GATES
+pod/app-deployment-nginx-69976db885-8qzx9   1/1     Running   0             12m   10.244.0.45   minikube   <none>           <none>
+pod/app-deployment-nginx-69976db885-fsp52   1/1     Running   0             12m   10.244.0.44   minikube   <none>           <none>
+pod/app-deployment-nginx-69976db885-jpc65   1/1     Running   0             12m   10.244.0.43   minikube   <none>           <none>
+pod/hello-node-7b4b746b66-9cr8x             1/1     Running   3 (13h ago)   45d   10.244.0.23   minikube   <none>           <none>
+```
+As you see here: the pods have got IPs under the same node that's why we could see this:
+
+```
+IP
+10.244.0.45
+10.244.0.44
+10.244.0.43
+10.244.0.23
+```
+
+And, this IP addresses are given to the pods in the node below:
+
+```
+$ kubectl get nodes -o wide
+
+NAME       STATUS   ROLES           AGE   VERSION   INTERNAL-IP    EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION     CONTAINER-RUNTIME
+minikube   Ready    control-plane   45d   v1.30.0   192.168.49.2   <none>        Ubuntu 22.04.4 LTS   5.15.49-linuxkit   docker://26.1.1
+```
+
+So, the node IP address is `192.168.49.2` and the pods are given the IP addresses above: `10.244.0.45, 10.244.0.44, 10.244.0.43, 10.244.0.23`
+
+Here's how the ASCII Art i.e. K8s architecture for networking or IPs is used:
+
+```
++-----------------------------------------------------------+
+|                       K8s Architecture                    |
++-----------------------------------------------------------+
+|                          Minikube                         |
+|-----------------------------------------------------------|
+| +-----------------------------------------------------+   |
+| |                 Minikube VM                         |   |
+| |-----------------------------------------------------|   |
+| | Node IP: 192.168.49.2                               |   |
+| | Pod CIDR: 10.244.0.0/24                             |   |
+| | +--------------------+   +-----------------------+  |   |
+| | | Pod A              |   | Pod B                 |  |   |
+| | | IP: 10.244.0.43    |   | IP: 10.244.0.44       |  |   |
+| | | app-deployment-nginx   |                       |  |   |
+| | +--------------------+   +-----------------------+  |   |
+| | +--------------------+   +-----------------------+  |   |
+| | | Pod C              |   | Pod D                 |  |   |
+| | | IP: 10.244.0.45    |   | IP: 10.244.0.23       |  |   |
+| | |                    |   | hello-node            |  |   |
+| | +--------------------+   +-----------------------+  |   |
+| +-----------------------------------------------------+   |
+|                                                           |
++-----------------------------------------------------------+
+
++-----------------------------------------------------------+
+|                   Standard K8s Cluster                    |
+|-----------------------------------------------------------|
+| +-----------------------------------------------------+   |
+| |                     Node 1                          |   |
+| |-----------------------------------------------------|   |
+| | Node IP: 192.168.1.1                                |   |
+| | Pod CIDR: 10.244.1.0/24                             |   |
+| | +--------------------+   +-----------------------+  |   |
+| | | Pod A              |   | Pod B                 |  |   |
+| | | IP: 10.244.1.2     |   | IP: 10.244.1.3        |  |   |
+| | +--------------------+   +-----------------------+  |   |
+| +-----------------------------------------------------+   |
+|                                                           |
+| +-----------------------------------------------------+   |
+| |                     Node 2                          |   |
+| |-----------------------------------------------------|   |
+| | Node IP: 192.168.1.2                                |   |
+| | Pod CIDR: 10.244.2.0/24                             |   |
+| | +--------------------+   +-----------------------+  |   |
+| | | Pod C              |   | Pod D                 |  |   |
+| | | IP: 10.244.2.2     |   | IP: 10.244.2.3        |  |   |
+| | +--------------------+   +-----------------------+  |   |
+| +-----------------------------------------------------+   |
+|                                                           |
+| Service Cluster IP Range: 10.96.0.0/12                    |
+|                                                           |
++-----------------------------------------------------------+
+
+```
+
+
