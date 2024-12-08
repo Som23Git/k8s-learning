@@ -1058,3 +1058,12 @@ spec:
   selector:
     app: prod-app
 ```
+when created the `service`, you can check the complete details using the `describe` service command:
+
+```
+kubectl describe service <service_name>
+
+OR
+
+kubectl describe svc <service_name>
+```
