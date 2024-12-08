@@ -1067,3 +1067,6 @@ OR
 
 kubectl describe svc <service_name>
 ```
+
+> [!NOTE]
+> Make use of the imperative commands i.e. the shortcut commands used in K8s from the [kubernetes official documentation](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/imperative-command/).
