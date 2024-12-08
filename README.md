@@ -968,5 +968,105 @@ There are three different types of Services:
 Now, when I curl from outside the VM i.e. from the internet, I should be able to get access to the pods/containers/applications inside the pods. In this scenario, it is `NGINX` application within the pods A, B, and C.
 
 > [!NOTE]  
-> When I try to access the website URL: 192.168.49.2:30007, I should be able to reach the nginx pod exposed via the service port 80.
-> Also, the NodePort service will automatically route the traffic between the pods within the same node or within the different nodes too. 
+> When I try to access the website URL: `192.168.49.2:30007`, I should be able to reach the nginx pod exposed via the `service port 80`.
+> Also, the NodePort service will automatically route the traffic between the pods within the same node or within the different nodes too. Basically, it act as a LoadBalancer and there is no need to specify or deploy it manually.
+
+####$ Example:
+
+- Before creating the service:
+
+
+```
+$ kubectl get all -o wide   
+
+NAME                 TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE   SELECTOR
+service/hello-node   LoadBalancer   10.103.22.214   <pending>     8080:31963/TCP   46d   k8s-app=hello-node
+service/kubernetes   ClusterIP      10.96.0.1       <none>        443/TCP          46d   <none>
+```
+
+- Post creating the service using the below definition file:
+
+```
+# service-definition.yaml
+apiVersion: v1
+kind: Service
+metadata: 
+  name: nginx-service
+  labels:
+    type: nodeport-service
+spec:
+  type: NodePort
+  ports:
+    - port: 80                   # service port that connects as a tunnel to the targetPort and the nodePort
+      targetPort: 80             # nginx pod port which called as targetPort
+      nodePort: 30007             # port that is in the node that gets exposed to the outside world or internet
+  selector:
+    app: prod-app
+```
+
+```
+$ kubectl create -f service-definition.yaml 
+service/nginx-service created
+```
+
+```
+$ kubectl get services -o wide
+NAME            TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE    SELECTOR
+hello-node      LoadBalancer   10.103.22.214   <pending>     8080:31963/TCP   46d    k8s-app=hello-node
+kubernetes      ClusterIP      10.96.0.1       <none>        443/TCP          46d    <none>
+nginx-service   NodePort       10.102.73.198   <none>        80:30007/TCP     2m5s   app=prod-app
+```
+
+You can also use `minikube service <service-name> --url` to get the URL that you can connect.
+
+#### ClusterIP Service & LoadBalancer Service
+
+- ClusterIP connects the internal pods and does not have any exposed ports to the internet.
+
+- LoadBalancer, it is basically the `NodePort` but it works well when using in the `GCP`, `AWS`, and `Azure` environment where it deploys the `LoadBalancer` in between the pods and the node(s).
+
+```
+# clusterip-service-definition.yaml
+apiVersion: v1
+kind: Service
+metadata: 
+  name: nginx-service
+  labels:
+    type: clusterIP-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    app: prod-app
+```
+```
+# loadbalancer-service-definition.yaml
+apiVersion: v1
+kind: Service
+metadata: 
+  name: nginx-service
+  labels:
+    type: nodeport-service
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30007
+  selector:
+    app: prod-app
+```
+when created the `service`, you can check the complete details using the `describe` service command:
+
+```
+kubectl describe service <service_name>
+
+OR
+
+kubectl describe svc <service_name>
+```
+
+> [!NOTE]
+> Make use of the imperative commands i.e. the shortcut commands used in K8s from the [kubernetes official documentation](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/imperative-command/).
