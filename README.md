@@ -908,3 +908,65 @@ Here's how the ASCII Art i.e. K8s architecture for networking or IPs is used:
 ```
 
 
+### Kubernetes Services
+
+[1] Services enable connectivity with the internal components and external components.
+[2] Services can work with the applications internally.
+
+There are three different types of Services:
+
+- NodePort
+- ClusterIP
+- LoadBalancer
+
+#### NodePort Service
+
+```
++-----------------------------------------------------------+
+|                       K8s Architecture                    |
++-----------------------------------------------------------+
+|                          Minikube                         |
+|-----------------------------------------------------------|
+| +-----------------------------------------------------+   |
+| |                 Minikube VM                         |   |
+| |-----------------------------------------------------|   |
+| | Node IP: 192.168.49.2                               |   |
+| | Pod CIDR: 10.244.0.0/24                             |   |
+| |                                                     |   |
+| |                                                     |   |
+| |                                                     |   |
+| |                                                     |   |
+| |      | Port 30007  |                                |   |
+| | +--------------------+                              |   |
+| | | NodePort Service   |                              |   |
+| | | IP: 10.244.0.43    |                              |   |
+| | | app-deployment-nginx                              |   |
+| | +--------------------+                              |   | 
+| |       | Port 80  |                                  |   |
+| |         |      |                                    |   |
+| |         |      |                                    |   |
+| |         |      |                                    |   |
+| |         |      |                                    |   | 
+| |       | Port 80  |                                  |   |
+| | +--------------------+   +-----------------------+  |   |
+| | | Pod A              |   | Pod B                 |  |   |
+| | | IP: 10.244.0.43    |   | IP: 10.244.0.44       |  |   |
+| | | app-deployment-nginx   |                       |  |   |
+| | +--------------------+   +-----------------------+  |   |
+| | +--------------------+   +-----------------------+  |   |
+| | | Pod C              |   | Pod D                 |  |   |
+| | | IP: 10.244.0.45    |   | IP: 10.244.0.23       |  |   |
+| | |                    |   | hello-node            |  |   |
+| | +--------------------+   +-----------------------+  |   |
+| |                              | Port 3232  |         |   |
+| |                                                     |   |
+| +-----------------------------------------------------+   |
+|                                                           |
++-----------------------------------------------------------+
+```
+
+Now, when I curl from outside the VM i.e. from the internet, I should be able to get access to the pods/containers/applications inside the pods. In this scenario, it is `NGINX` application within the pods A, B, and C.
+
+> [!NOTE]  
+> When I try to access the website URL: 192.168.49.2:30007, I should be able to reach the nginx pod exposed via the service port 80.
+> Also, the NodePort service will automatically route the traffic between the pods within the same node or within the different nodes too. 
