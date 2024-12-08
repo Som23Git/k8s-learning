@@ -971,7 +971,7 @@ Now, when I curl from outside the VM i.e. from the internet, I should be able to
 > When I try to access the website URL: `192.168.49.2:30007`, I should be able to reach the nginx pod exposed via the `service port 80`.
 > Also, the NodePort service will automatically route the traffic between the pods within the same node or within the different nodes too. Basically, it act as a LoadBalancer and there is no need to specify or deploy it manually.
 
-#### Example:
+####$ Example:
 
 - Before creating the service:
 
@@ -1015,4 +1015,46 @@ NAME            TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)          AG
 hello-node      LoadBalancer   10.103.22.214   <pending>     8080:31963/TCP   46d    k8s-app=hello-node
 kubernetes      ClusterIP      10.96.0.1       <none>        443/TCP          46d    <none>
 nginx-service   NodePort       10.102.73.198   <none>        80:30007/TCP     2m5s   app=prod-app
+```
+
+You can also use `minikube service <service-name> --url` to get the URL that you can connect.
+
+#### ClusterIP Service & LoadBalancer Service
+
+- ClusterIP connects the internal pods and does not have any exposed ports to the internet.
+
+- LoadBalancer, it is basically the `NodePort` but it works well when using in the `GCP`, `AWS`, and `Azure` environment where it deploys the `LoadBalancer` in between the pods and the node(s).
+
+```
+# clusterip-service-definition.yaml
+apiVersion: v1
+kind: Service
+metadata: 
+  name: nginx-service
+  labels:
+    type: clusterIP-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    app: prod-app
+```
+```
+# loadbalancer-service-definition.yaml
+apiVersion: v1
+kind: Service
+metadata: 
+  name: nginx-service
+  labels:
+    type: nodeport-service
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30007
+  selector:
+    app: prod-app
 ```
