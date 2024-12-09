@@ -609,7 +609,7 @@ FIELDS:
     Most recently observed status of the Deployment.
 ```
 
-### Deployment Updates, Rollout, and Versioning
+#### Deployment Updates, Rollout, and Versioning
 
 Commands you to run Rollout strategy: 
 [1] Rolling update 
@@ -908,7 +908,7 @@ Here's how the ASCII Art i.e. K8s architecture for networking or IPs is used:
 ```
 
 
-### Kubernetes Services
+### Services in Kubernetes
 
 [1] Services enable connectivity with the internal components and external components.
 [2] Services can work with the applications internally.
@@ -1070,3 +1070,11 @@ kubectl describe svc <service_name>
 
 > [!NOTE]
 > Make use of the imperative commands i.e. the shortcut commands used in K8s from the [kubernetes official documentation](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/imperative-command/).
+
+### Microservices Architecture
+
+Let's create a voting app and result app in K8s considering a Microservice Architecture:
+
+```
+apiVersion: v1
+```
