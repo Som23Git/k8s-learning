@@ -1075,6 +1075,46 @@ kubectl describe svc <service_name>
 
 Let's create a voting app and result app in K8s considering a Microservice Architecture:
 
+Please refer to the files in the directory [voting-app](./voting-app)
+
+Once you execute, `kubectl create -f .`, it will create all the pods and the services associated with the pod for the voting app.
+
+The output looks like this:
+
 ```
-apiVersion: v1
+$ kubectl get all -o wide    
+
+NAME                              READY   STATUS    RESTARTS        AGE   IP            NODE       NOMINATED NODE   READINESS GATES
+pod/postgres-pod                  1/1     Running   0               16m   10.244.0.53   minikube   <none>           <none>
+pod/redis                         1/1     Running   0               34m   10.244.0.47   minikube   <none>           <none>
+pod/result-app-pod                1/1     Running   3 (16m ago)     34m   10.244.0.48   minikube   <none>           <none>
+pod/voting-app-pod                1/1     Running   0               34m   10.244.0.49   minikube   <none>           <none>
+pod/worker                        1/1     Running   6 (8m54s ago)   12m   10.244.0.54   minikube   <none>           <none>
+
+NAME                     TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE     SELECTOR
+service/db               ClusterIP      10.102.64.116    <none>        5432/TCP         23m     pod=db-pod
+service/kubernetes       ClusterIP      10.96.0.1        <none>        443/TCP          47d     <none>
+service/nginx-service    NodePort       10.102.73.198    <none>        80:30007/TCP     24h     app=prod-app
+service/redis            ClusterIP      10.100.115.238   <none>        6379/TCP         6m50s   pod=redis
+service/result-service   NodePort       10.104.9.71      <none>        80:30081/TCP     6m50s   pod=result-app-pod
+service/voting-service   NodePort       10.105.162.209   <none>        80:30080/TCP     111s    pod=voting-app-pod
+
 ```
+
+And, once you make sure all the services and pods are `UP` and `Running`, you can get the `service URL` from the `minikube` command:
+
+For voting-service:
+```
+minikube service voting-service --url
+http://127.0.0.1:49609
+
+```
+
+And, for result-service:
+
+```
+minikube service result-service --url
+http://127.0.0.1:49639
+
+```
+Now, you should be able to access the application and could notice the change in the number of votes.
