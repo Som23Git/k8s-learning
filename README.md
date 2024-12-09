@@ -1118,3 +1118,83 @@ http://127.0.0.1:49639
 
 ```
 Now, you should be able to access the application and could notice the change in the number of votes.
+
+> ![Important]
+> For more details on the code and the repository: we can check this [kodekloud's repo](https://github.com/kodekloudhub/example-voting-app/tree/master/k8s-specifications)
+
+### Kubernetes on Cloud
+
+IN GKE or AWS or AKS:
+We need to change the `NodePort` type of the `Service` to `LoadBalancer` type in voting-app service and result-ap service.
+
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: voting-service
+  labels:
+    name: voting-service
+    app: demo-voting-app
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    name: voting-app-pod
+    app: demo-voting-app
+```
+
+And,
+
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: result-service
+  labels:
+    name: result-service
+    app: demo-voting-app
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    name: result-app-pod
+    app: demo-voting-app
+```
+
+Once you deploy all the pods and services in the GKE or other cloud providers, it will assign the `external IP` for the LoadBalancer services so that we can reach the application from outside.
+
+```
+$ kubectl get all -o wide
+
+NAME                                     READY   STATUS    RESTARTS   AGE   IP           NODE                                             NOMINATED NODE   READINESS GATES
+pod/postgres-deploy-776f4bdfcb-mlg22     1/1     Running   0          87s   10.120.1.3   gke-som-gke-cluster-default-pool-98c25668-kkvj   <none>           <none>
+pod/redis-deploy-54b67b7b4-r7z2t         1/1     Running   0          86s   10.120.7.3   gke-som-gke-cluster-default-pool-5a6cf592-b2g0   <none>           <none>
+pod/result-app-deploy-7cc95854b6-jqd7b   1/1     Running   0          85s   10.120.3.4   gke-som-gke-cluster-default-pool-d134ac34-0x9r   <none>           <none>
+pod/voting-app-deploy-96f58547f-r5lg8    1/1     Running   0          84s   10.120.8.4   gke-som-gke-cluster-default-pool-5a6cf592-jvj6   <none>           <none>
+pod/worker-app-deploy-54575bd48c-kgk2f   1/1     Running   0          84s   10.120.0.4   gke-som-gke-cluster-default-pool-98c25668-h2pc   <none>           <none>
+
+NAME                     TYPE           CLUSTER-IP       EXTERNAL-IP     PORT(S)        AGE     SELECTOR
+service/db               ClusterIP      34.118.226.245   <none>          5432/TCP       86s     app=demo-voting-app,name=postgres-pod
+service/kubernetes       ClusterIP      34.118.224.1     <none>          443/TCP        8m16s   <none>
+service/redis            ClusterIP      34.118.228.197   <none>          6379/TCP       85s     app=demo-voting-app,name=redis-pod
+service/result-service   LoadBalancer   34.118.235.13    34.72.60.201    80:31723/TCP   85s     app=demo-voting-app,name=result-app-pod
+service/voting-service   LoadBalancer   34.118.228.248   34.123.71.190   80:32610/TCP   84s     app=demo-voting-app,name=voting-app-pod
+
+NAME                                READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES                                 SELECTOR
+deployment.apps/postgres-deploy     1/1     1            1           88s   postgres     postgres                               app=demo-voting-app,name=postgres-pod
+deployment.apps/redis-deploy        1/1     1            1           87s   redis        redis                                  app=demo-voting-app,name=redis-pod
+deployment.apps/result-app-deploy   1/1     1            1           86s   result-app   kodekloud/examplevotingapp_result:v1   app=demo-voting-app,name=result-app-pod
+deployment.apps/voting-app-deploy   1/1     1            1           86s   voting-app   kodekloud/examplevotingapp_vote:v1     app=demo-voting-app,name=voting-app-pod
+deployment.apps/worker-app-deploy   1/1     1            1           85s   worker-app   kodekloud/examplevotingapp_worker:v1   app=demo-voting-app,name=worker-app-pod
+
+NAME                                           DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES                                 SELECTOR
+replicaset.apps/postgres-deploy-776f4bdfcb     1         1         1       88s   postgres     postgres                               app=demo-voting-app,name=postgres-pod,pod-template-hash=776f4bdfcb
+replicaset.apps/redis-deploy-54b67b7b4         1         1         1       87s   redis        redis                                  app=demo-voting-app,name=redis-pod,pod-template-hash=54b67b7b4
+replicaset.apps/result-app-deploy-7cc95854b6   1         1         1       86s   result-app   kodekloud/examplevotingapp_result:v1   app=demo-voting-app,name=result-app-pod,pod-template-hash=7cc95854b6
+replicaset.apps/voting-app-deploy-96f58547f    1         1         1       85s   voting-app   kodekloud/examplevotingapp_vote:v1     app=demo-voting-app,name=voting-app-pod,pod-template-hash=96f58547f
+replicaset.apps/worker-app-deploy-54575bd48c   1         1         1       85s   worker-app   kodekloud/examplevotingapp_worker:v1   app=demo-voting-app,name=worker-app-pod,pod-template-hash=54575bd48c
+```
