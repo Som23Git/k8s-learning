@@ -1198,3 +1198,28 @@ replicaset.apps/result-app-deploy-7cc95854b6   1         1         1       86s  
 replicaset.apps/voting-app-deploy-96f58547f    1         1         1       85s   voting-app   kodekloud/examplevotingapp_vote:v1     app=demo-voting-app,name=voting-app-pod,pod-template-hash=96f58547f
 replicaset.apps/worker-app-deploy-54575bd48c   1         1         1       85s   worker-app   kodekloud/examplevotingapp_worker:v1   app=demo-voting-app,name=worker-app-pod,pod-template-hash=54575bd48c
 ```
+
+### K8s Setup with Kubeadm
+
+Kubeadm - called as KubeAdmin which will take care of complete installation and management of the production-grade k8s cluster. Kubeadm is the starting point of how you can manage the cluster's TLS certs, pod network, connection between the Master and the Worker Nodes.
+
+It keeps things simple and straightforward. This is the tool most of the GKE, AKS, AWS EKS are using to deploy managed K8s solution in the cloud infrastructure.
+
+We can make use of the `Vagrant` tool to install a self-managed K8s cluster with 1 master node and 2 worker nodes.
+
+
+### K8s Setup with Minikube
+
+Minikube is a all-in-one K8s box where, it deploys a node(master node/worker node) that got all the K8s components i.e. API server, etcd(key-value store), controllers i.e. node controller and replica controller, kubelet, and the container runtime i.e. containerD in my case. You may use the virual box as the driver and as a container runtime too. Please check the below links:
+
+Install and set up the kubectl tool: https://kubernetes.io/docs/tasks/tools/
+
+Install Minikube: https://minikube.sigs.k8s.io/docs/start/
+
+Install VirtualBox: https://www.virtualbox.org/wiki/Downloads
+
+https://www.virtualbox.org/wiki/Linux_Downloads
+
+Minikube Tutorial: https://kubernetes.io/docs/tutorials/hello-minikube/
+
+If the minikube installation has been done on the macOS, then to access the URL on the local browser, we need to do a few steps to get the service URL to work. Those steps are covered on this documentation page: https://minikube.sigs.k8s.io/docs/handbook/accessing/#using-minikube-service-with-tunnel
