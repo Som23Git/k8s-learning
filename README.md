@@ -1210,7 +1210,7 @@ We can make use of the `Vagrant` tool to install a self-managed K8s cluster with
 
 ### K8s Setup with Minikube
 
-Minikube is a all-in-one K8s box where, it deploys a node(master node/worker node) that got all the K8s components i.e. API server, etcd(key-value store), controllers i.e. node controller and replica controller, kubelet, and the container runtime i.e. containerD in my case. You may use the virual box as the driver and as a container runtime too. Please check the below links:
+Minikube is a all-in-one K8s box where, it deploys a node(master node/worker node) that got all the K8s components i.e. API server, etcd(key-value store), controllers i.e. node controller and replica controller, kubelet, scheduler, and the container runtime i.e. containerD in my case. You may use the virual box as the driver and as a container runtime too. Please check the below links:
 
 Install and set up the kubectl tool: https://kubernetes.io/docs/tasks/tools/
 
