@@ -6,6 +6,7 @@ https://www.cncf.io/certification/cka
 Mode of delivery: Online
 Online Proctor will be available
 
+----
 ### Prerequesites
 
 It tests your hands-on skills.
@@ -28,7 +29,9 @@ Exam Tips: http://training.linuxfoundation.org/go//Important-Tips-CKA-CKAD
 
 Head over to this link to enroll in the Certification Exam. Remember to keep the code – 20KODE – handy to get a 20% discount while registering for the CKA exam with Linux Foundation.
 
+----
 ### Core Concepts
+----
 
 #### Cluster Architecture
 
@@ -53,6 +56,8 @@ These are very important to run the containers on the worker nodes and master no
 Kubelet - It is an agent that runs on each node in a K8s cluster. It listens for instructions from the Kube-APIServer and Kube-APIServer talks with the Kubelet to get the status of the nodes and containers. It is the captain manages containers on the nodes.
 
 Kube-Proxy - It is a service that allows connections and network between the applications that are deployed in the worker nodes.
+
+----
 
 ### ETCD for Beginners
 
@@ -112,6 +117,9 @@ $ ./etcdctl version
 etcdctl version: 3.3.11
 API version: 3.3
 ```
+
+----
+
 ### ETCD for Kubernetes
 
 What is the role of the ETCD in the K8s?
@@ -182,6 +190,7 @@ $ kubectl exec etcd-master -n kube-system etcdctl get / --prefix -keys-only
 /registry/apiregistration.k8s.io/apiservices/v1.authentication.k8s.io
 
 ```
+----
 
 ### Kube-API Server
 
@@ -219,6 +228,7 @@ $ cat /etc/systemd/system/kube-apiserver.service
 
 $ ps -aux | grep -e "kube-apiserver"
 ```
+----
 
 ### Kube Controller Manager
 
@@ -275,6 +285,7 @@ $ cat /etc/systemd/system/kube-controller-manager.service
 
 $ ps -aux | grep -e "kube-controller-manager"
 ```
+----
 
 ### Kube Scheduler
 
@@ -310,6 +321,7 @@ $ cat /etc/systemd/system/kube-scheduler.service
 
 $ ps -aux | grep -e "kube-scheduler"
 ```
+----
 
 ### Kubelet
 
@@ -335,6 +347,7 @@ $ cat /etc/systemd/system/kubelet.service
 
 $ ps -aux | grep -e "kubelet"
 ```
+----
 
 ### Kube Proxy
 
@@ -366,5 +379,6 @@ $ cat /etc/systemd/system/kube-proxy.service
 
 $ ps -aux | grep -e "kube-proxy"
 ```
+----
 
 ### Pods
