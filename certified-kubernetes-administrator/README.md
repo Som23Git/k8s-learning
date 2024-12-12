@@ -127,26 +127,26 @@ ETCD is reponsible to journal each and every tasks and operations that are happe
 For example, ETCDCTL `version 2` supports the following commands:
 
 ```
-etcdctl backup
-etcdctl cluster-health
-etcdctl mk
-etcdctl mkdir
-etcdctl set
+$ etcdctl backup
+$ etcdctl cluster-health
+$ etcdctl mk
+$ etcdctl mkdir
+$ etcdctl set
 ```
 
 Whereas the commands are different in `version 3`
 
 ```
-etcdctl snapshot save
-etcdctl endpoint health
-etcdctl get
-etcdctl put
+$ etcdctl snapshot save
+$ etcdctl endpoint health
+$ etcdctl get
+$ etcdctl put
 ```
 
 To set the right version of API set the environment variable `ETCDCTL_API` command
 
 ```
-export ETCDCTL_API=3
+$ export ETCDCTL_API=3
 ```
 
 When the API version is not set, it is assumed to be set to version 2. And version 3 commands listed above don’t work. When API version is set to version 3, version 2 commands listed above don’t work.
@@ -162,7 +162,61 @@ Apart from that, you must also specify the path to certificate files so that `ET
 So for the commands, you must specify the `ETCDCTL API` version and path to `certificate` files. Below is the final form:
 
 ```
-kubectl exec etcd-controlplane -n kube-system -- sh -c "ETCDCTL_API=3 etcdctl get / --prefix --keys-only --limit=10 --cacert /etc/kubernetes/pki/etcd/ca.crt --cert /etc/kubernetes/pki/etcd/server.crt --key /etc/kubernetes/pki/etcd/server.key"
+$ kubectl exec etcd-controlplane -n kube-system -- sh -c "ETCDCTL_API=3 etcdctl get / --prefix --keys-only --limit=10 --cacert /etc/kubernetes/pki/etcd/ca.crt --cert /etc/kubernetes/pki/etcd/server.crt --key /etc/kubernetes/pki/etcd/server.key"
+```
+
+> ![NOTE]
+> Only when the ETCD key-value store is updated, any operations that are considered as completed or else, it is NOT.
+> --advertise-client-urls https://${etcd_server}:2379 -- This is the default port that ETCD_server listens and this is important.
+
+```
+# Important command to display the keys stored in the etcd server - you would need to run this command inside the etcd-master pod
+
+$ kubectl exec etcd-master -n kube-system etcdctl get / --prefix -keys-only
+
+# K8s stores data in a specific directory structure, being the /root directory is `/registry`
+# Example:
+
+/registry/apiregistration.k8s.io/apiservices/v1.
+/registry/apiregistration.k8s.io/apiservices/v1.apps
+/registry/apiregistration.k8s.io/apiservices/v1.authentication.k8s.io
+
 ```
 
 ### Kube-API Server
+
+General responsibilities of the `kube-api` server:
+
+- Authenticate User
+- Validate request
+- Retrieve data from ETCD datastore
+- Update ETCD
+- Scheduler
+- Kubelet
+
+> ![NOTE]
+> When using the `kubeadm` tool, it deploys kube-api server on our behalf and it does the heavy-lifting but, to understand how it all configured, you would need to download the binary of the `kube-apiserver` and add the configuration flags/parameters to connect to the cluster accordingly.
+
+#### Commands that you can use to find the kube-apiserver
+
+```
+# When using `kubeadm` it deploys the kube-apiserver as a pod
+
+$ kubectl get pods -n kube-system
+
+To get the configurations of the kube-apiserver, we can check:
+
+$ cat /etc/kubernetes/manifests/kube-apiserver.yaml
+
+# When deploying it from scratch using binary, where it is a non-kubeadm setup:
+
+$ cat /etc/systemd/system/kube-apiserver.service
+
+# Or, you can use the process command to check the parameters passed to run the kube-apiserver
+
+$ ps -aux | grep -e "kube-apiserver"
+```
+
+### Kube Controller Manager
+
+
