@@ -194,7 +194,7 @@ General responsibilities of the `kube-api` server:
 - Scheduler
 - Kubelet
 
-> ![NOTE]
+> [!NOTE]
 > When using the `kubeadm` tool, it deploys kube-api server on our behalf and it does the heavy-lifting but, to understand how it all configured, you would need to download the binary of the `kube-apiserver` and add the configuration flags/parameters to connect to the cluster accordingly.
 
 #### Commands that you can use to find the kube-apiserver
@@ -315,7 +315,7 @@ $ ps -aux | grep -e "kube-scheduler"
 
 `Kubelet` is like a captain on the ship. There are sole point of contact of the master ship and send reports of the ship to the master. Basically, once the `kube-scheduler` decides the best node to deploy/create the pods or containers. It will pass its information to `kubelet` via `kube-apiserver`. This `kubelet` immediately gets the information from the `kube-apiserver` and informs the `container runtime` i.e. `Docker` or `containerD` to pull the images of the containers from the repository and deploy it.
 
-> ![CAUTION]
+> [!CAUTION]
 > `kubeadm` tool does not deploy `kubelet` as a pod or create it by itself. We need to manually install & run the `kubelet` service on the worker nodes.
 
 #### Commands that you can use to find the kubelet
