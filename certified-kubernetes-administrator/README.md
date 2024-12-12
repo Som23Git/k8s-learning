@@ -200,6 +200,7 @@ General responsibilities of the `kube-api` server:
 #### Commands that you can use to find the kube-apiserver
 
 ```
+---- kubeadm setup ----
 # When using `kubeadm` it deploys the kube-apiserver as a pod
 
 $ kubectl get pods -n kube-system
@@ -207,6 +208,8 @@ $ kubectl get pods -n kube-system
 To get the configurations of the kube-apiserver, we can check:
 
 $ cat /etc/kubernetes/manifests/kube-apiserver.yaml
+
+---- Non-kubeadm setup ----
 
 # When deploying it from scratch using binary, where it is a non-kubeadm setup:
 
@@ -219,4 +222,92 @@ $ ps -aux | grep -e "kube-apiserver"
 
 ### Kube Controller Manager
 
+It amnaged various contorleler in k8s, it has its own responbsibliities:
 
+- Node controllers
+    * Monitoring the status of the nodes, and tries to add the nodes if they are failed.
+    * Checks every `5s` with the nodes whether the node is healthy or NOT. If the node is unhealthy and does not respond to the healthcheck, then it waits for `40s` to consider the node is `unhealthy` and `unreachable`. After `5m`, the node-controller will move the pods in those that nodes to a new one i.e. create new pods in the node(s) that are healthy.
+
+```
+Node Monitor Period: 5s
+Node Monitor Grace Period: 40s
+Pod Eviction Timeout: 5m
+```
+- Replication controllers
+   * Monitoring the status of the pods, and tries to maintain the desired number of pods are available within the replicaset at any time. If any pods fail, it will make sure to create a new one.
+
+There are many-more controllers in the K8s cluster:
+
+- Deployment-controller
+- Namespace-controller
+- Endpoint-controller
+- Cronjob
+- Job-controller
+- PV-Protection-controller
+- Service-Account-contoller
+- Stateful-Set
+- Replicaset
+- Node-controller
+- PV-Binder-controller
+- Replication-controller
+and many more ...
+
+All the above controller(s) are packaged into a single process called `Kube-controller-manager`.
+
+#### Commands that you can use to find the kube-apiserver
+
+```
+---- kubeadm setup ----
+# When using `kubeadm` it deploys the kube-controller-manager as a pod
+
+$ kubectl get pods -n kube-system
+
+To get the configurations of the kube-controller-manager, we can check:
+
+$ cat /etc/kubernetes/manifests/kube-controller-manager.yaml
+
+---- Non-kubeadm setup ----
+
+# When deploying it from scratch using binary, where it is a non-kubeadm setup:
+
+$ cat /etc/systemd/system/kube-controller-manager.service
+
+# Or, you can use the process command to check the parameters passed to run the kube-controller-manager
+
+$ ps -aux | grep -e "kube-controller-manager"
+```
+
+### Kube Scheduler
+
+Scheduler is only responsible for `DECIDING` which pods goes on which nodes and it does not deploy/create those pods in the nodes.
+
+> Breaking down how it decides or takes decision that which nodes are the best to deploy/create a pod?
+
+Let's take an example of a pod A, that got resource requirements of 10 CPUs and there are 4 nodes with 4 CPUs, 6 CPUs, 12 CPUs, and 16 CPUs. So, below are the methods that it follows:
+
+- "Filter's the nodes" that got `greater than or equal` CPUs so, in this case, it will be just 2 nodes that got 12 CPUs and 16 CPUs available.
+- "Ranks the nodes" that got free CPUs once the pod is deployed/created. In this scenario, there will be just 2 CPUs left in Node A and 6 CPUs left in Node B.
+- Now, it decides that Node B is the best node that the pod can be deployed and informs the `Kubelet` to create/deploy the pods.
+
+#### Commands that you can use to find the kube-scheduler
+
+```
+---- kubeadm setup ----
+# When using `kubeadm` it deploys the kube-scheduler as a pod
+
+$ kubectl get pods -n kube-system
+
+To get the configurations of the kube-scheduler, we can check:
+
+$ cat /etc/kubernetes/manifests/kube-scheduler.yaml
+
+---- Non-kubeadm setup ----
+
+# When deploying it from scratch using binary, where it is a non-kubeadm setup:
+
+$ cat /etc/systemd/system/kube-scheduler.service
+
+# Or, you can use the process command to check the parameters passed to run the kube-scheduler
+
+$ ps -aux | grep -e "kube-scheduler"
+```
