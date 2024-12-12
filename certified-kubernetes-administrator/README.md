@@ -222,7 +222,7 @@ $ ps -aux | grep -e "kube-apiserver"
 
 ### Kube Controller Manager
 
-It amnaged various contorleler in k8s, it has its own responbsibliities:
+It manages various controllers in a k8s cluster and it has its own responsibilities:
 
 - Node controllers
     * Monitoring the status of the nodes, and tries to add the nodes if they are failed.
@@ -249,12 +249,11 @@ There are many-more controllers in the K8s cluster:
 - Replicaset
 - Node-controller
 - PV-Binder-controller
-- Replication-controller
-and many more ...
+- Replication-controller and many more ...
 
 All the above controller(s) are packaged into a single process called `Kube-controller-manager`.
 
-#### Commands that you can use to find the kube-apiserver
+#### Commands that you can use to find the kube-controller-manager
 
 ```
 ---- kubeadm setup ----
@@ -311,3 +310,61 @@ $ cat /etc/systemd/system/kube-scheduler.service
 
 $ ps -aux | grep -e "kube-scheduler"
 ```
+
+### Kubelet
+
+`Kubelet` is like a captain on the ship. There are sole point of contact of the master ship and send reports of the ship to the master. Basically, once the `kube-scheduler` decides the best node to deploy/create the pods or containers. It will pass its information to `kubelet` via `kube-apiserver`. This `kubelet` immediately gets the information from the `kube-apiserver` and informs the `container runtime` i.e. `Docker` or `containerD` to pull the images of the containers from the repository and deploy it.
+
+> ![CAUTION]
+> `kubeadm` tool does not deploy `kubelet` as a pod or create it by itself. We need to manually install & run the `kubelet` service on the worker nodes.
+
+#### Commands that you can use to find the kubelet
+
+```
+---- kubeadm setup ----
+
+NO Kubeadm setup
+
+---- Supports only non-kubeadm setup ----
+
+# When deploying it from scratch using binary, where it is a non-kubeadm setup:
+
+$ cat /etc/systemd/system/kubelet.service
+
+# Or, you can use the process command to check the parameters passed to run the kubelet
+
+$ ps -aux | grep -e "kubelet"
+```
+
+### Kube Proxy
+
+pod network - weave net
+
+`kube-proxy` runs on each node as a process and it's job is to look for new services like `clusterIP`, `NodePort`, and `LoadBalancer` as these are virtual components and everytime a new service is created, it makes sure to create IP rules so that it can forward the traffic to the backend pods within the nodes. It uses `IP-Table` rules in each node of the cluster and forwards traffic.
+
+#### Commands that you can use to find the kube Proxy
+
+```
+---- kubeadm setup ----
+# When using `kubeadm` it deploys the kube-proxy as a pod, infact this is a `daemonset`
+
+$ kubectl get pods -n kube-system
+
+$ kubectl get daemonset -n kube-system
+
+To get the configurations of the kube-scheduler, we can check:
+
+$ cat /etc/kubernetes/manifests/kube-proxy.yaml
+
+---- Non-kubeadm setup ----
+
+# When deploying it from scratch using binary, where it is a non-kubeadm setup:
+
+$ cat /etc/systemd/system/kube-proxy.service
+
+# Or, you can use the process command to check the parameters passed to run the kube-proxy
+
+$ ps -aux | grep -e "kube-proxy"
+```
+
+### Pods
