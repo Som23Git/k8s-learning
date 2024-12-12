@@ -165,7 +165,7 @@ So for the commands, you must specify the `ETCDCTL API` version and path to `cer
 $ kubectl exec etcd-controlplane -n kube-system -- sh -c "ETCDCTL_API=3 etcdctl get / --prefix --keys-only --limit=10 --cacert /etc/kubernetes/pki/etcd/ca.crt --cert /etc/kubernetes/pki/etcd/server.crt --key /etc/kubernetes/pki/etcd/server.key"
 ```
 
-> ![NOTE]
+> [!NOTE]
 > Only when the ETCD key-value store is updated, any operations that are considered as completed or else, it is NOT.
 > --advertise-client-urls https://${etcd_server}:2379 -- This is the default port that ETCD_server listens and this is important.
 
