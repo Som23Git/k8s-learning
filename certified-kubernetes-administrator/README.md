@@ -382,3 +382,997 @@ $ ps -aux | grep -e "kube-proxy"
 ----
 
 ### Pods
+
+- What are pods?
+
+Pods are the smallest `object` that we can create within the K8s cluster. It's basically K8s cluster(consider, it's a single node cluster) > Node > Pod > Containers. So, you create containers within the pod and scale the pods while you want to scale the containers.
+
+To create a pod from the command line, use the command:
+
+Create an NGINX Pod
+
+kubectl run nginx --image=nginx
+
+As of version 1.18, kubectl run (without any arguments such as --generator ) will create a pod instead of a deployment.
+
+To create a deployment using imperative command, use kubectl create:
+
+kubectl create deployment nginx --image=nginx
+
+Kubernetes Concepts – https://kubernetes.io/docs/concepts/
+
+Pod Overview- https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/
+
+#### YAML and how to construct it?
+
+Starting with key-value pairs:
+
+```
+# All key-values pair(s) have space after the colon.
+fruit: apple
+liquid: water
+gas: oxygen
+number: one
+```
+
+Arrays
+
+```
+fruits:
+-  apple
+-  mango
+-  orange
+-  banana
+```
+So, all items in the array should follow the `-` hyphen in front and with equal number of spaces. Note, it is not restricted to have a only 2 or 3 spaces after hyphen but to keep it legible and need, 2 or 3 should work.
+
+
+Dictionaries/Map
+
+```
+fruit:
+   - - - - - - - - - - -
+- | Banana:             |
+  |   calories: 100g    |
+  |   fat: 20g          |   <----- Dictionaries
+  |   carbs: 20g        |
+- | Apple:              |
+  |   calories: 200g    |
+  |   fat: 2g           |
+  |   carbs: 100g       |
+   - - - - - - - - - - -
+```
+
+So, dictionaries are the properties of the `object` where in the above example, the object is banana and its properties are calories, fat, carbs. So, for dictionaries, you would need to give the key and place the objects below with a space.
+
+#### Pods with YAML
+
+Please note, when creating the pods, the K8s cluster should have `4 ROOT LEVEL properties`:
+
+```
+#pod-definition.yml
+
+apiVersion:
+kind:
+metadata:
+spec:
+```
+
+The above ones are the mandatory properties.
+
+Now, let's create an example `pod-definition.yml`
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: app-dev
+  labels: 
+    type: front-end
+    app: development
+spec:
+  containers:
+    - name: nginx-container
+      image: nginx
+```
+
+Use the below command to create the pod in the K8s cluster:
+
+```
+kubectl create -f pod-definition.yml
+```
+
+Use the below command to get the pods:
+
+```
+kubectl get pods
+```
+
+And,
+
+```
+kubectl describe pod <pod_name>
+```
+
+
+Also, you can make use of the commands to quickly perform a dry-run.
+
+```
+kubectl run nginx --image=nginx --dry-run=client -o yaml 
+
+# Response/Output
+
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: nginx
+  name: nginx
+spec:
+  containers:
+  - image: nginx
+    name: nginx
+    resources: {}
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+status: {}
+
+We can save its output to a YAML file and can rerun it quickly like
+kubectl run nginx --image=nginx --dry-run=client -o yaml >> output.yaml
+```
+---
+
+### Replication Controller
+
+Replication controllers allows us to run multiple instances of single pod in the cluster.
+
+There are two terms:
+[1] Replication Controller - Older terminology
+[2] Replica Set - Latest
+
+Major difference between [1] and [2] is the:
+
+```
+selector:
+  matchLabels:
+    type: front-end
+```
+
+The `selectors` are NOT mandatory for the replication controllers but, it is mandatory for the replicasets.
+
+#### Scaling of Replicas
+
+Commands used here:
+```
+kubectl create -f replicaset-definition.yaml
+
+kubectl get replicaset
+
+kubectl delete <replicaset_name>     ---- This deletes all the pods underlying the replicasets
+
+kubectl replace -f replicaset-definition.yml
+
+kubectl scale --replicas=6 -f replicaset.yml
+```
+
+Below is the replicaset and replication controller yaml definition file:
+
+```
+# Replication Controller
+
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: app-rc
+  labels: 
+    type: replication_controller
+spec:
+  template:
+    metadata:
+      name: app-dev
+      labels: 
+        type: front-end
+        app: development
+    spec:
+      containers:
+        - name: nginx-container
+          image: nginx
+  replicas: 3
+
+# Response/Output:
+
+% kubectl get pods                                        
+NAME                   READY   STATUS              RESTARTS   AGE
+app-rc-9gbgl           0/1     ContainerCreating   0          3s
+app-rc-dlb6z           0/1     ContainerCreating   0          3s
+app-rc-mcv78           0/1     ContainerCreating   0          3s
+app-replicaset-cjfmx   1/1     Running             0          113s
+app-replicaset-fmzn6   1/1     Running             0          113s
+app-replicaset-j99z5   1/1     Running             0          113s
+
+% kubectl get pods
+NAME                   READY   STATUS              RESTARTS   AGE
+app-rc-9gbgl           0/1     ContainerCreating   0          6s
+app-rc-dlb6z           1/1     Running             0          6s
+app-rc-mcv78           1/1     Running             0          6s
+app-replicaset-cjfmx   1/1     Running             0          116s
+app-replicaset-fmzn6   1/1     Running             0          116s
+app-replicaset-j99z5   1/1     Running             0          116s
+
+% kubectl get pods
+NAME                   READY   STATUS    RESTARTS   AGE
+app-rc-9gbgl           1/1     Running   0          9s
+app-rc-dlb6z           1/1     Running   0          9s
+app-rc-mcv78           1/1     Running   0          9s
+app-replicaset-cjfmx   1/1     Running   0          119s
+app-replicaset-fmzn6   1/1     Running   0          119s
+app-replicaset-j99z5   1/1     Running   0          119s
+```
+
+
+```
+# Replicaset definition file
+
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: app-replicaset
+  labels: 
+    type: replication_set
+spec:
+  template:
+    metadata:
+      name: app-dev
+      labels: 
+        type: front-end
+        app: development
+    spec:
+      containers:
+        - name: nginx-container
+          image: nginx
+  replicas: 3
+  selector:
+    matchLabels:
+      type: front-end
+
+# Response/Output:
+
+% kubectl get pods
+NAME                   READY   STATUS              RESTARTS   AGE
+app-replicaset-cjfmx   1/1     Running             0          6s
+app-replicaset-fmzn6   0/1     ContainerCreating   0          6s
+app-replicaset-j99z5   0/1     ContainerCreating   0          6s
+
+% kubectl get pods
+NAME                   READY   STATUS    RESTARTS   AGE
+app-replicaset-cjfmx   1/1     Running   0          10s
+app-replicaset-fmzn6   1/1     Running   0          10s
+app-replicaset-j99z5   1/1     Running   0          10s
+```
+
+#### After Scaling:
+
+```
+% kubectl scale --replicas=6 -f replicaset-definition.yaml 
+replicaset.apps/app-replicaset scaled
+
+% kubectl get pods                                        
+NAME                   READY   STATUS              RESTARTS   AGE
+app-rc-9gbgl           1/1     Running             0          86s
+app-rc-dlb6z           1/1     Running             0          86s
+app-rc-mcv78           1/1     Running             0          86s
+app-replicaset-82b88   0/1     ContainerCreating   0          3s
+app-replicaset-b8djw   0/1     ContainerCreating   0          3s
+app-replicaset-cjfmx   1/1     Running             0          3m16s
+app-replicaset-d6tcb   1/1     Running             0          3s
+app-replicaset-fmzn6   1/1     Running             0          3m16s
+app-replicaset-j99z5   1/1     Running             0          3m16s
+
+% kubectl get pods
+NAME                   READY   STATUS    RESTARTS   AGE
+app-rc-9gbgl           1/1     Running   0          95s
+app-rc-dlb6z           1/1     Running   0          95s
+app-rc-mcv78           1/1     Running   0          95s
+app-replicaset-82b88   1/1     Running   0          12s
+app-replicaset-b8djw   1/1     Running   0          12s
+app-replicaset-cjfmx   1/1     Running   0          3m25s
+app-replicaset-d6tcb   1/1     Running   0          12s
+app-replicaset-fmzn6   1/1     Running   0          3m25s
+app-replicaset-j99z5   1/1     Running   0          3m25s
+```
+
+#### Delete replicaset
+
+```
+% kubectl get replicaset 
+NAME             DESIRED   CURRENT   READY   AGE
+app-replicaset   6         6         6       5m8s
+
+% kubectl delete replicaset app-replicaset
+replicaset.apps "app-replicaset" deleted
+
+% kubectl get pods                        
+NAME           READY   STATUS    RESTARTS   AGE
+app-rc-9gbgl   1/1     Running   0          3m57s
+app-rc-dlb6z   1/1     Running   0          3m57s
+app-rc-mcv78   1/1     Running   0          3m57s
+
+% kubectl get replicaset                  
+No resources found in default namespace.
+```
+
+As we mentioned above, deleting the `replicaset` will also delete the pods as you in the above output.
+
+#### Delete Replication Controller
+
+```
+% kubectl get replicationcontroller
+NAME     DESIRED   CURRENT   READY   AGE
+app-rc   3         3         3       9m27s
+
+% kubectl delete replicacontroller app-rc
+error: the server doesn't have a resource type "replicacontroller"
+
+% kubectl delete replicationcontroller app-rc
+replicationcontroller "app-rc" deleted
+
+% kubectl get pods
+No resources found in default namespace.
+```
+
+Now, we created pods via the `replicaset` and `replicationcontroller` and deleted them.
+
+#### Additional Commands:
+
+```
+
+$ kubectl get pods - Lists all pods in the namespace.  
+$ kubectl get replicaset - Lists all ReplicaSets in the namespace.  
+$ kubectl describe replicaset <replica-set-name> - Shows details of a specific ReplicaSet.  
+$ kubectl describe pod <pod-name> - Displays detailed information about a pod.  
+$ kubectl delete pod <pod-name> - Deletes a specific pod.  
+$ kubectl create -f <replicaset-definition-file>.yaml - Creates a ReplicaSet from a YAML file.  
+$ kubectl delete replicaset <replica-set-name> - Deletes a specific ReplicaSet.  
+$ kubectl edit replicaset <replica-set-name> - Modifies a ReplicaSet in real-time.  
+$ kubectl delete pods <pod-name-pattern> - Deletes pods matching a pattern.  
+$ kubectl scale replicaset <replica-set-name> --replicas=<number> - Scales the ReplicaSet to a specified number of replicas.  
+
+Then, to delete all the pod in one go:
+
+$ kubectl delete pods --all
+$ kubectl delete pods -l <label-key>=<label-value>
+$ kubectl delete pods --all -n <namespace>
+
+# Important, when in doubt, you can use:
+
+
+$ kubectl explain replicaset
+$ kubectl explain replicationcontroller
+$ kubectl explain pod
+
+So, the above explain command will give us the details of what to use.
+
+# shorthand:
+
+$ kubectl get rs - For replicasets
+$ kubectl get deploy - For deployments
+```
+
+---
+
+### Deployments
+
+```
+$ kubectl create -f deployment-definition.yaml
+deployment.apps/app-deployment created
+```
+```
+$ kubectl get all 
+
+NAME                                  READY   STATUS    RESTARTS   AGE
+pod/app-deployment-85489cdd5b-7294b   1/1     Running   0          14s
+pod/app-deployment-85489cdd5b-926jt   1/1     Running   0          14s
+pod/app-deployment-85489cdd5b-wjq2b   1/1     Running   0          14s
+
+NAME                 TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   44d
+
+NAME                             READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/app-deployment   3/3     3            3           14s
+
+NAME                                        DESIRED   CURRENT   READY   AGE
+replicaset.apps/app-deployment-85489cdd5b   3         3         3       14s
+```
+The deployment definition file, will automatically create the replicaset and the pods.
+
+```
+# deployment-definition.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata: 
+  name: app-deployment
+spec:
+  template:
+    metadata:
+      name: pod-nginx
+      labels:
+        type: frontend
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+  replicas: 3
+  selector:
+    matchLabels:
+      type: frontend
+```
+
+```
+# This explain command will be very handy:
+$ kubectl explain deployments
+
+GROUP:      apps
+KIND:       Deployment
+VERSION:    v1
+
+DESCRIPTION:
+    Deployment enables declarative updates for Pods and ReplicaSets.
+    
+FIELDS:
+  apiVersion    <string>
+    APIVersion defines the versioned schema of this representation of an object.
+    Servers should convert recognized schemas to the latest internal value, and
+    may reject unrecognized values. More info:
+    https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+
+  kind  <string>
+    Kind is a string value representing the REST resource this object
+    represents. Servers may infer this from the endpoint the client submits
+    requests to. Cannot be updated. In CamelCase. More info:
+    https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+
+  metadata      <ObjectMeta>
+    Standard object's metadata. More info:
+    https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+
+  spec  <DeploymentSpec>
+    Specification of the desired behavior of the Deployment.
+
+  status        <DeploymentStatus>
+    Most recently observed status of the Deployment.
+```
+
+
+#### Deployment Updates, Rollout, and Versioning
+
+Commands you to run Rollout strategy: 
+[1] Rolling update 
+[2] Recreate
+
+```
+kubectl create -f deployment-definition.yml
+kubectl get deployments
+kubectl apply -f deployment-definition.yml
+kubectl set image deployment/myapp-deployment nginx=nginx:1.9.1
+kubectl rollout status deployment/myapp-deployment
+kubectl rollout history deployment/myapp-deployment
+kubectl rollout undo deployment/myapp-deployment
+kubectl create -f deployment-definition.yml --record=true
+```
+
+```
+$ kubectl get pods -o wide
+
+NAME                                    READY   STATUS    RESTARTS      AGE   IP            NODE       NOMINATED NODE   READINESS GATES
+app-deployment-nginx-69976db885-5wn4v   1/1     Running   0             13m   10.244.0.34   minikube   <none>           <none>
+app-deployment-nginx-69976db885-7q9qx   1/1     Running   0             13m   10.244.0.36   minikube   <none>           <none>
+app-deployment-nginx-69976db885-xv58d   1/1     Running   0             13m   10.244.0.35   minikube   <none>           <none>
+hello-node-7b4b746b66-9cr8x             1/1     Running   3 (12h ago)   45d   10.244.0.23   minikube   <none>           <none>
+
+$ kubectl get all -o wide 
+
+NAME                                        READY   STATUS    RESTARTS      AGE   IP            NODE       NOMINATED NODE   READINESS GATES
+pod/app-deployment-nginx-69976db885-5wn4v   1/1     Running   0             13m   10.244.0.34   minikube   <none>           <none>
+pod/app-deployment-nginx-69976db885-7q9qx   1/1     Running   0             13m   10.244.0.36   minikube   <none>           <none>
+pod/app-deployment-nginx-69976db885-xv58d   1/1     Running   0             13m   10.244.0.35   minikube   <none>           <none>
+pod/hello-node-7b4b746b66-9cr8x             1/1     Running   3 (12h ago)   45d   10.244.0.23   minikube   <none>           <none>
+
+NAME                                  TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE   SELECTOR
+service/hello-node                    LoadBalancer   10.103.22.214    <pending>     8080:31963/TCP   45d   k8s-app=hello-node
+service/kubernetes                    ClusterIP      10.96.0.1        <none>        443/TCP          45d   <none>
+
+NAME                                   READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS        IMAGES                                         SELECTOR
+deployment.apps/app-deployment-nginx   3/3     3            3           13m   nginx-container   nginx                                          type=frontend
+deployment.apps/hello-node             1/1     1            1           45d   hello-node        registry.k8s.io/e2e-test-images/agnhost:2.39   k8s-app=hello-node
+
+NAME                                              DESIRED   CURRENT   READY   AGE   CONTAINERS        IMAGES                                         SELECTOR
+replicaset.apps/app-deployment-nginx-69976db885   3         3         3       13m   nginx-container   nginx                                          pod-template-hash=69976db885,type=frontend
+replicaset.apps/hello-node-7b4b746b66             1         1         1       45d   hello-node        registry.k8s.io/e2e-test-images/agnhost:2.39   k8s-app=hello-node,pod-template-hash=7b4b746b66
+
+
+$ kubectl edit deployment app-deployment-nginx
+deployment.apps/app-deployment-nginx edited
+
+$ kubectl rollout status deployment app-deployment-nginx
+deployment "app-deployment-nginx" successfully rolled out
+
+$ kubectl rollout history deployment app-deployment-nginx
+deployment.apps/app-deployment-nginx 
+REVISION  CHANGE-CAUSE
+1         <none>
+
+$ kubectl get all -o wide
+
+NAME                                        READY   STATUS    RESTARTS      AGE   IP            NODE       NOMINATED NODE   READINESS GATES
+pod/app-deployment-nginx-69976db885-5wn4v   1/1     Running   0             18m   10.244.0.34   minikube   <none>           <none>
+pod/app-deployment-nginx-69976db885-7q9qx   1/1     Running   0             18m   10.244.0.36   minikube   <none>           <none>
+pod/app-deployment-nginx-69976db885-xv58d   1/1     Running   0             18m   10.244.0.35   minikube   <none>           <none>
+pod/hello-node-7b4b746b66-9cr8x             1/1     Running   3 (12h ago)   45d   10.244.0.23   minikube   <none>           <none>
+
+NAME                                  TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE   SELECTOR
+service/hello-node                    LoadBalancer   10.103.22.214    <pending>     8080:31963/TCP   45d   k8s-app=hello-node
+service/kubernetes                    ClusterIP      10.96.0.1        <none>        443/TCP          45d   <none>
+
+NAME                                   READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS        IMAGES                                         SELECTOR
+deployment.apps/app-deployment-nginx   3/3     3            3           18m   nginx-container   nginx                                          type=frontend
+deployment.apps/hello-node             1/1     1            1           45d   hello-node        registry.k8s.io/e2e-test-images/agnhost:2.39   k8s-app=hello-node
+
+NAME                                              DESIRED   CURRENT   READY   AGE   CONTAINERS        IMAGES                                         SELECTOR
+replicaset.apps/app-deployment-nginx-69976db885   3         3         3       18m   nginx-container   nginx                                          pod-template-hash=69976db885,type=frontend
+replicaset.apps/hello-node-7b4b746b66             1         1         1       45d   hello-node        registry.k8s.io/e2e-test-images/agnhost:2.39   k8s-app=hello-node,pod-template-hash=7b4b746b66
+
+----- ERROR -----
+
+$ kubectl set image deployment nginx-container=nginx:1.18
+error: resource(s) were provided, but no name was specified
+
+----- ERROR -----
+
+$ kubectl set image deployment app-deployment-nginx nginx-container=nginx:1.18
+deployment.apps/app-deployment-nginx image updated
+
+$ kubectl rollout status deployment app-deployment-nginx  
+Waiting for deployment "app-deployment-nginx" rollout to finish: 0 of 3 updated replicas are available...
+Waiting for deployment "app-deployment-nginx" rollout to finish: 1 of 3 updated replicas are available...
+Waiting for deployment "app-deployment-nginx" rollout to finish: 2 of 3 updated replicas are available...
+deployment "app-deployment-nginx" successfully rolled out
+
+$ kubectl get all -o wide 
+
+NAME                                        READY   STATUS    RESTARTS      AGE   IP            NODE       NOMINATED NODE   READINESS GATES
+pod/app-deployment-nginx-7554f76c4c-6st79   1/1     Running   0             37s   10.244.0.42   minikube   <none>           <none>
+pod/app-deployment-nginx-7554f76c4c-gs9cn   1/1     Running   0             37s   10.244.0.40   minikube   <none>           <none>
+pod/app-deployment-nginx-7554f76c4c-pnchj   1/1     Running   0             37s   10.244.0.41   minikube   <none>           <none>
+pod/hello-node-7b4b746b66-9cr8x             1/1     Running   3 (12h ago)   45d   10.244.0.23   minikube   <none>           <none>
+
+NAME                                  TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE   SELECTOR
+service/hello-node                    LoadBalancer   10.103.22.214    <pending>     8080:31963/TCP   45d   k8s-app=hello-node
+service/kubernetes                    ClusterIP      10.96.0.1        <none>        443/TCP          45d   <none>
+
+NAME                                   READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS        IMAGES                                         SELECTOR
+deployment.apps/app-deployment-nginx   3/3     3            3           20m   nginx-container   nginx:1.18                                     type=frontend
+deployment.apps/hello-node             1/1     1            1           45d   hello-node        registry.k8s.io/e2e-test-images/agnhost:2.39   k8s-app=hello-node
+
+NAME                                              DESIRED   CURRENT   READY   AGE   CONTAINERS        IMAGES                                         SELECTOR
+replicaset.apps/app-deployment-nginx-69976db885   0         0         0       20m   nginx-container   nginx                                          pod-template-hash=69976db885,type=frontend
+replicaset.apps/app-deployment-nginx-7554f76c4c   3         3         3       37s   nginx-container   nginx:1.18                                     pod-template-hash=7554f76c4c,type=frontend
+replicaset.apps/hello-node-7b4b746b66             1         1         1       45d   hello-node        registry.k8s.io/e2e-test-images/agnhost:2.39   k8s-app=hello-node,pod-template-hash=7b4b746b66
+
+
+$ kubectl rollout undo deployment app-deployment-nginx
+deployment.apps/app-deployment-nginx rolled back
+
+$ kubectl get all -o wide 
+
+NAME                                        READY   STATUS              RESTARTS      AGE   IP            NODE       NOMINATED NODE   READINESS GATES
+pod/app-deployment-nginx-69976db885-8qzx9   0/1     ContainerCreating   0             3s    <none>        minikube   <none>           <none>
+pod/app-deployment-nginx-69976db885-fsp52   0/1     ContainerCreating   0             3s    <none>        minikube   <none>           <none>
+pod/app-deployment-nginx-69976db885-jpc65   0/1     ContainerCreating   0             3s    <none>        minikube   <none>           <none>
+pod/hello-node-7b4b746b66-9cr8x             1/1     Running             3 (12h ago)   45d   10.244.0.23   minikube   <none>           <none>
+
+NAME                                  TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE   SELECTOR
+service/hello-node                    LoadBalancer   10.103.22.214    <pending>     8080:31963/TCP   45d   k8s-app=hello-node
+service/kubernetes                    ClusterIP      10.96.0.1        <none>        443/TCP          45d   <none>
+
+NAME                                   READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS        IMAGES                                         SELECTOR
+deployment.apps/app-deployment-nginx   0/3     3            0           20m   nginx-container   nginx                                          type=frontend
+deployment.apps/hello-node             1/1     1            1           45d   hello-node        registry.k8s.io/e2e-test-images/agnhost:2.39   k8s-app=hello-node
+
+NAME                                              DESIRED   CURRENT   READY   AGE   CONTAINERS        IMAGES                                         SELECTOR
+replicaset.apps/app-deployment-nginx-69976db885   3         3         0       20m   nginx-container   nginx                                          pod-template-hash=69976db885,type=frontend
+replicaset.apps/app-deployment-nginx-7554f76c4c   0         0         0       64s   nginx-container   nginx:1.18                                     pod-template-hash=7554f76c4c,type=frontend
+replicaset.apps/hello-node-7b4b746b66             1         1         1       45d   hello-node        registry.k8s.io/e2e-test-images/agnhost:2.39   k8s-app=hello-node,pod-template-hash=7b4b746b66
+
+
+$ kubectl get all -o wide
+
+NAME                                        READY   STATUS              RESTARTS      AGE   IP            NODE       NOMINATED NODE   READINESS GATES
+pod/app-deployment-nginx-69976db885-8qzx9   0/1     ContainerCreating   0             9s    <none>        minikube   <none>           <none>
+pod/app-deployment-nginx-69976db885-fsp52   1/1     Running             0             9s    10.244.0.44   minikube   <none>           <none>
+pod/app-deployment-nginx-69976db885-jpc65   1/1     Running             0             9s    10.244.0.43   minikube   <none>           <none>
+pod/hello-node-7b4b746b66-9cr8x             1/1     Running             3 (12h ago)   45d   10.244.0.23   minikube   <none>           <none>
+
+NAME                                  TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE   SELECTOR
+service/hello-node                    LoadBalancer   10.103.22.214    <pending>     8080:31963/TCP   45d   k8s-app=hello-node
+service/kubernetes                    ClusterIP      10.96.0.1        <none>        443/TCP          45d   <none>
+
+NAME                                   READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS        IMAGES                                         SELECTOR
+deployment.apps/app-deployment-nginx   2/3     3            2           20m   nginx-container   nginx                                          type=frontend
+deployment.apps/hello-node             1/1     1            1           45d   hello-node        registry.k8s.io/e2e-test-images/agnhost:2.39   k8s-app=hello-node
+
+NAME                                              DESIRED   CURRENT   READY   AGE   CONTAINERS        IMAGES                                         SELECTOR
+replicaset.apps/app-deployment-nginx-69976db885   3         3         2       20m   nginx-container   nginx                                          pod-template-hash=69976db885,type=frontend
+replicaset.apps/app-deployment-nginx-7554f76c4c   0         0         0       70s   nginx-container   nginx:1.18                                     pod-template-hash=7554f76c4c,type=frontend
+replicaset.apps/hello-node-7b4b746b66             1         1         1       45d   hello-node        registry.k8s.io/e2e-test-images/agnhost:2.39   k8s-app=hello-node,pod-template-hash=7b4b746b66
+
+
+$ kubectl get all -o wide
+
+NAME                                        READY   STATUS    RESTARTS      AGE   IP            NODE       NOMINATED NODE   READINESS GATES
+pod/app-deployment-nginx-69976db885-8qzx9   1/1     Running   0             11s   10.244.0.45   minikube   <none>           <none>
+pod/app-deployment-nginx-69976db885-fsp52   1/1     Running   0             11s   10.244.0.44   minikube   <none>           <none>
+pod/app-deployment-nginx-69976db885-jpc65   1/1     Running   0             11s   10.244.0.43   minikube   <none>           <none>
+pod/hello-node-7b4b746b66-9cr8x             1/1     Running   3 (12h ago)   45d   10.244.0.23   minikube   <none>           <none>
+
+NAME                                  TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE   SELECTOR
+service/hello-node                    LoadBalancer   10.103.22.214    <pending>     8080:31963/TCP   45d   k8s-app=hello-node
+service/kubernetes                    ClusterIP      10.96.0.1        <none>        443/TCP          45d   <none>
+
+NAME                                   READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS        IMAGES                                         SELECTOR
+deployment.apps/app-deployment-nginx   3/3     3            3           20m   nginx-container   nginx                                          type=frontend
+deployment.apps/hello-node             1/1     1            1           45d   hello-node        registry.k8s.io/e2e-test-images/agnhost:2.39   k8s-app=hello-node
+
+NAME                                              DESIRED   CURRENT   READY   AGE   CONTAINERS        IMAGES                                         SELECTOR
+replicaset.apps/app-deployment-nginx-69976db885   3         3         3       20m   nginx-container   nginx                                          pod-template-hash=69976db885,type=frontend
+replicaset.apps/app-deployment-nginx-7554f76c4c   0         0         0       72s   nginx-container   nginx:1.18                                     pod-template-hash=7554f76c4c,type=frontend
+replicaset.apps/hello-node-7b4b746b66             1         1         1       45d   hello-node        registry.k8s.io/e2e-test-images/agnhost:2.39   k8s-app=hello-node,pod-template-hash=7b4b746b66
+
+
+$ kubectl get all -o wide
+
+NAME                                        READY   STATUS    RESTARTS      AGE   IP            NODE       NOMINATED NODE   READINESS GATES
+pod/app-deployment-nginx-69976db885-8qzx9   1/1     Running   0             14s   10.244.0.45   minikube   <none>           <none>
+pod/app-deployment-nginx-69976db885-fsp52   1/1     Running   0             14s   10.244.0.44   minikube   <none>           <none>
+pod/app-deployment-nginx-69976db885-jpc65   1/1     Running   0             14s   10.244.0.43   minikube   <none>           <none>
+pod/hello-node-7b4b746b66-9cr8x             1/1     Running   3 (12h ago)   45d   10.244.0.23   minikube   <none>           <none>
+
+NAME                                  TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE   SELECTOR
+service/hello-node                    LoadBalancer   10.103.22.214    <pending>     8080:31963/TCP   45d   k8s-app=hello-node
+service/kubernetes                    ClusterIP      10.96.0.1        <none>        443/TCP          45d   <none>
+
+NAME                                   READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS        IMAGES                                         SELECTOR
+deployment.apps/app-deployment-nginx   3/3     3            3           20m   nginx-container   nginx                                          type=frontend
+deployment.apps/hello-node             1/1     1            1           45d   hello-node        registry.k8s.io/e2e-test-images/agnhost:2.39   k8s-app=hello-node
+
+NAME                                              DESIRED   CURRENT   READY   AGE   CONTAINERS        IMAGES                                         SELECTOR
+replicaset.apps/app-deployment-nginx-69976db885   3         3         3       20m   nginx-container   nginx                                          pod-template-hash=69976db885,type=frontend
+replicaset.apps/app-deployment-nginx-7554f76c4c   0         0         0       75s   nginx-container   nginx:1.18                                     pod-template-hash=7554f76c4c,type=frontend
+replicaset.apps/hello-node-7b4b746b66             1         1         1       45d   hello-node        registry.k8s.io/e2e-test-images/agnhost:2.39   k8s-app=hello-node,pod-template-hash=7b4b746b66
+
+```
+
+---
+## :rotating_light: Certification Tip:
+
+Here’s a tip!
+
+As you might have seen already, creating and editing YAML files is a bit difficult, especially in the CLI. During the exam, you might find it difficult to copy and paste YAML files from the browser to the terminal. Using the kubectl run command can help in generating a YAML template. And sometimes, you can even get away with just the kubectl run command without having to create a YAML file at all. For example, if you were asked to create a pod or deployment with a specific name and image, you can simply run the kubectl run command.
+
+Use the below set of commands and try the previous practice tests again, but this time, try to use the below commands instead of YAML files. Try to use these as much as you can going forward in all exercises.
+
+Reference (Bookmark this page for the exam. It will be very handy):
+
+https://kubernetes.io/docs/reference/kubectl/conventions/
+
+Create an NGINX Pod
+
+```
+$ kubectl run nginx --image=nginx
+```
+
+Generate POD Manifest YAML file (-o yaml). Don’t create it(–dry-run)
+
+```
+$ kubectl run nginx --image=nginx --dry-run=client -o yaml
+```
+
+Create a deployment
+
+```
+$ kubectl create deployment --image=nginx nginx
+```
+
+Generate Deployment YAML file (-o yaml). Don’t create it(–dry-run)
+
+```
+$ kubectl create deployment --image=nginx nginx --dry-run=client -o yaml
+```
+
+Generate Deployment YAML file (-o yaml). Don’t create it(–dry-run) and save it to a file.
+
+```
+$ kubectl create deployment --image=nginx nginx --dry-run=client -o yaml > nginx-deployment.yaml
+```
+
+Make necessary changes to the file (for example, adding more replicas) and then create the deployment.
+
+```
+$ kubectl create -f nginx-deployment.yaml
+```
+OR
+
+In k8s version 1.19+, we can specify the –replicas option to create a deployment with 4 replicas.
+
+```
+$ kubectl create deployment --image=nginx nginx --replicas=4 --dry-run=client -o yaml > nginx-deployment.yaml
+```
+
+----
+
+### Services
+
+[1] Services enable connectivity with the internal components and external components.
+[2] Services can work with the applications internally.
+
+There are three different types of Services:
+
+- NodePort - Range - 30000 to 32767 
+- ClusterIP
+- LoadBalancer
+
+#### NodePort Service
+
+```
++-----------------------------------------------------------+
+|                       K8s Architecture                    |
++-----------------------------------------------------------+
+|                          Minikube                         |
+|-----------------------------------------------------------|
+| +-----------------------------------------------------+   |
+| |                 Minikube VM                         |   |
+| |-----------------------------------------------------|   |
+| | Node IP: 192.168.49.2                               |   |
+| | Pod CIDR: 10.244.0.0/24                             |   |
+| |                                                     |   |
+| |                                                     |   |
+| |                                                     |   |
+| |                                                     |   |
+| |      | Port 30007  |                                |   |
+| | +--------------------+                              |   |
+| | | NodePort Service   |                              |   |
+| | | IP: 10.244.0.43    |                              |   |
+| | | app-deployment-nginx                              |   |
+| | +--------------------+                              |   | 
+| |       | Port 80  |                                  |   |
+| |         |      |                                    |   |
+| |         |      |                                    |   |
+| |         |      |                                    |   |
+| |         |      |                                    |   | 
+| |       | Port 80  |                                  |   |
+| | +--------------------+   +-----------------------+  |   |
+| | | Pod A              |   | Pod B                 |  |   |
+| | | IP: 10.244.0.43    |   | IP: 10.244.0.44       |  |   |
+| | | app-deployment-nginx   |                       |  |   |
+| | +--------------------+   +-----------------------+  |   |
+| | +--------------------+   +-----------------------+  |   |
+| | | Pod C              |   | Pod D                 |  |   |
+| | | IP: 10.244.0.45    |   | IP: 10.244.0.23       |  |   |
+| | |                    |   | hello-node            |  |   |
+| | +--------------------+   +-----------------------+  |   |
+| |                              | Port 3232  |         |   |
+| |                                                     |   |
+| +-----------------------------------------------------+   |
+|                                                           |
++-----------------------------------------------------------+
+```
+
+Now, when I curl from outside the VM i.e. from the internet, I should be able to get access to the pods/containers/applications inside the pods. In this scenario, it is `NGINX` application within the pods A, B, and C.
+
+> [!NOTE]  
+> When I try to access the website URL: `192.168.49.2:30007`, I should be able to reach the nginx pod exposed via the `service port 80`.
+> Also, the NodePort service will automatically route the traffic between the pods within the same node or within the different nodes too. Basically, it act as a LoadBalancer and there is no need to specify or deploy it manually.
+
+####$ Example:
+
+- Before creating the service:
+
+
+```
+$ kubectl get all -o wide   
+
+NAME                 TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE   SELECTOR
+service/hello-node   LoadBalancer   10.103.22.214   <pending>     8080:31963/TCP   46d   k8s-app=hello-node
+service/kubernetes   ClusterIP      10.96.0.1       <none>        443/TCP          46d   <none>
+```
+
+- Post creating the service using the below definition file:
+
+```
+# service-definition.yaml
+apiVersion: v1
+kind: Service
+metadata: 
+  name: nginx-service
+  labels:
+    type: nodeport-service
+spec:
+  type: NodePort
+  ports:
+    - port: 80                   # service port that connects as a tunnel to the targetPort and the nodePort
+      targetPort: 80             # nginx pod port which called as targetPort
+      nodePort: 30007            # port that is in the node that gets exposed to the outside world or internet
+  selector:
+    app: prod-app
+```
+
+```
+$ kubectl create -f service-definition.yaml 
+service/nginx-service created
+```
+
+```
+$ kubectl get services -o wide
+NAME            TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE    SELECTOR
+hello-node      LoadBalancer   10.103.22.214   <pending>     8080:31963/TCP   46d    k8s-app=hello-node
+kubernetes      ClusterIP      10.96.0.1       <none>        443/TCP          46d    <none>
+nginx-service   NodePort       10.102.73.198   <none>        80:30007/TCP     2m5s   app=prod-app
+```
+
+You can also use `minikube service <service-name> --url` to get the URL that you can connect.
+
+#### ClusterIP Service & LoadBalancer Service
+
+- ClusterIP connects the internal pods and does not have any exposed ports to the internet.
+
+- LoadBalancer, it is basically the `NodePort` but it works well when using in the `GCP`, `AWS`, and `Azure` environment where it deploys the `LoadBalancer` in between the pods and the node(s).
+
+```
+# clusterip-service-definition.yaml
+apiVersion: v1
+kind: Service
+metadata: 
+  name: nginx-service
+  labels:
+    type: clusterIP-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    app: prod-app
+```
+```
+# loadbalancer-service-definition.yaml
+apiVersion: v1
+kind: Service
+metadata: 
+  name: nginx-service
+  labels:
+    type: nodeport-service
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30007
+  selector:
+    app: prod-app
+```
+when created the `service`, you can check the complete details using the `describe` service command:
+
+```
+kubectl describe service <service_name>
+
+OR
+
+kubectl describe svc <service_name>
+```
+
+> [!NOTE]
+> Make use of the imperative commands i.e. the shortcut commands used in K8s from the [kubernetes official documentation](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/imperative-command/).
+
+
+----
+
+### Namespaces
+
+There are three important namespaces:
+
+- kube-system (where, the k8s components are isolated)
+- default
+- kube-public (this is where the resources made available to the users)
+
+Namespaces are mostly used in the `dev` and `prod` environments.
+
+Each of the namespaces can have the own `resource-limits` and `policies` so that you can instruct them to do what.
+
+To create namespace:
+
+```
+# namespace-dev.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+    name: dev   
+```
+
+Followed by:
+
+```
+$ kubectl create -f namespace-dev.yaml
+```
+
+Or, using the `implicit` commands:
+
+```
+$ kubectl create namespace dev
+```
+
+#### Additional namespace commands:
+
+```
+# Get pods from a specific namespace
+$ kubectl get pods --namespace=dev
+
+# Get pods from the default namespace
+$ kubectl get pods 
+
+# To set a specific namespace permanently instead of default namespace
+$ kubectl config set-context $(kubetl config current-context) --namespace=dev
+
+# To get the pods in all namespaces
+$ kubectl get pods --all-namespaces
+```
+
+#### How to Add Resource Limits to the Namespaces
+
+```
+# compute-quota.yaml
+
+apiVersion: v1
+kind: ResourceQuota
+metadata: 
+    name: compute-quota
+    namespace: dev
+spec:
+    hard:
+        pods: "10"
+        requests.cpu: "4"
+        requests.memory: 5Gi
+        limits.cpu: "10"
+        limits.memory: 10Gi
+```
+
+```
+$ kubectl create -f compute-quota.yaml
+```
+Get all namespaces
+
+```
+$ kubectl get namespaces
+
+NAME              STATUS   AGE
+default           Active   8m45s
+dev               Active   30s
+finance           Active   30s
+kube-node-lease   Active   8m45s
+kube-public       Active   8m45s
+kube-system       Active   8m46s
+manufacturing     Active   30s
+marketing         Active   30s
+prod              Active   30s
+research          Active   30s
+```
+
+```
+$ kubectl get pods --all-namespaces
+
+OR
+
+$ kubectl get pods -A
+```
+
+### Imperative and Declarative Commands
+

@@ -534,7 +534,7 @@ $ kubectl create -f deployment-definition.yaml
 deployment.apps/app-deployment created
 ```
 ```
-$ kubctl get all 
+$ kubectl get all 
 
 NAME                                  READY   STATUS    RESTARTS   AGE
 pod/app-deployment-85489cdd5b-7294b   1/1     Running   0          14s
