@@ -1110,5 +1110,269 @@ $ kubectl create deployment --image=nginx nginx --replicas=4 --dry-run=client -o
 
 ----
 
+### Services
 
+[1] Services enable connectivity with the internal components and external components.
+[2] Services can work with the applications internally.
+
+There are three different types of Services:
+
+- NodePort - Range - 30000 to 32767 
+- ClusterIP
+- LoadBalancer
+
+#### NodePort Service
+
+```
++-----------------------------------------------------------+
+|                       K8s Architecture                    |
++-----------------------------------------------------------+
+|                          Minikube                         |
+|-----------------------------------------------------------|
+| +-----------------------------------------------------+   |
+| |                 Minikube VM                         |   |
+| |-----------------------------------------------------|   |
+| | Node IP: 192.168.49.2                               |   |
+| | Pod CIDR: 10.244.0.0/24                             |   |
+| |                                                     |   |
+| |                                                     |   |
+| |                                                     |   |
+| |                                                     |   |
+| |      | Port 30007  |                                |   |
+| | +--------------------+                              |   |
+| | | NodePort Service   |                              |   |
+| | | IP: 10.244.0.43    |                              |   |
+| | | app-deployment-nginx                              |   |
+| | +--------------------+                              |   | 
+| |       | Port 80  |                                  |   |
+| |         |      |                                    |   |
+| |         |      |                                    |   |
+| |         |      |                                    |   |
+| |         |      |                                    |   | 
+| |       | Port 80  |                                  |   |
+| | +--------------------+   +-----------------------+  |   |
+| | | Pod A              |   | Pod B                 |  |   |
+| | | IP: 10.244.0.43    |   | IP: 10.244.0.44       |  |   |
+| | | app-deployment-nginx   |                       |  |   |
+| | +--------------------+   +-----------------------+  |   |
+| | +--------------------+   +-----------------------+  |   |
+| | | Pod C              |   | Pod D                 |  |   |
+| | | IP: 10.244.0.45    |   | IP: 10.244.0.23       |  |   |
+| | |                    |   | hello-node            |  |   |
+| | +--------------------+   +-----------------------+  |   |
+| |                              | Port 3232  |         |   |
+| |                                                     |   |
+| +-----------------------------------------------------+   |
+|                                                           |
++-----------------------------------------------------------+
+```
+
+Now, when I curl from outside the VM i.e. from the internet, I should be able to get access to the pods/containers/applications inside the pods. In this scenario, it is `NGINX` application within the pods A, B, and C.
+
+> [!NOTE]  
+> When I try to access the website URL: `192.168.49.2:30007`, I should be able to reach the nginx pod exposed via the `service port 80`.
+> Also, the NodePort service will automatically route the traffic between the pods within the same node or within the different nodes too. Basically, it act as a LoadBalancer and there is no need to specify or deploy it manually.
+
+####$ Example:
+
+- Before creating the service:
+
+
+```
+$ kubectl get all -o wide   
+
+NAME                 TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE   SELECTOR
+service/hello-node   LoadBalancer   10.103.22.214   <pending>     8080:31963/TCP   46d   k8s-app=hello-node
+service/kubernetes   ClusterIP      10.96.0.1       <none>        443/TCP          46d   <none>
+```
+
+- Post creating the service using the below definition file:
+
+```
+# service-definition.yaml
+apiVersion: v1
+kind: Service
+metadata: 
+  name: nginx-service
+  labels:
+    type: nodeport-service
+spec:
+  type: NodePort
+  ports:
+    - port: 80                   # service port that connects as a tunnel to the targetPort and the nodePort
+      targetPort: 80             # nginx pod port which called as targetPort
+      nodePort: 30007            # port that is in the node that gets exposed to the outside world or internet
+  selector:
+    app: prod-app
+```
+
+```
+$ kubectl create -f service-definition.yaml 
+service/nginx-service created
+```
+
+```
+$ kubectl get services -o wide
+NAME            TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE    SELECTOR
+hello-node      LoadBalancer   10.103.22.214   <pending>     8080:31963/TCP   46d    k8s-app=hello-node
+kubernetes      ClusterIP      10.96.0.1       <none>        443/TCP          46d    <none>
+nginx-service   NodePort       10.102.73.198   <none>        80:30007/TCP     2m5s   app=prod-app
+```
+
+You can also use `minikube service <service-name> --url` to get the URL that you can connect.
+
+#### ClusterIP Service & LoadBalancer Service
+
+- ClusterIP connects the internal pods and does not have any exposed ports to the internet.
+
+- LoadBalancer, it is basically the `NodePort` but it works well when using in the `GCP`, `AWS`, and `Azure` environment where it deploys the `LoadBalancer` in between the pods and the node(s).
+
+```
+# clusterip-service-definition.yaml
+apiVersion: v1
+kind: Service
+metadata: 
+  name: nginx-service
+  labels:
+    type: clusterIP-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    app: prod-app
+```
+```
+# loadbalancer-service-definition.yaml
+apiVersion: v1
+kind: Service
+metadata: 
+  name: nginx-service
+  labels:
+    type: nodeport-service
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30007
+  selector:
+    app: prod-app
+```
+when created the `service`, you can check the complete details using the `describe` service command:
+
+```
+kubectl describe service <service_name>
+
+OR
+
+kubectl describe svc <service_name>
+```
+
+> [!NOTE]
+> Make use of the imperative commands i.e. the shortcut commands used in K8s from the [kubernetes official documentation](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/imperative-command/).
+
+
+----
+
+### Namespaces
+
+There are three important namespaces:
+
+- kube-system (where, the k8s components are isolated)
+- default
+- kube-public (this is where the resources made available to the users)
+
+Namespaces are mostly used in the `dev` and `prod` environments.
+
+Each of the namespaces can have the own `resource-limits` and `policies` so that you can instruct them to do what.
+
+To create namespace:
+
+```
+# namespace-dev.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+    name: dev   
+```
+
+Followed by:
+
+```
+$ kubectl create -f namespace-dev.yaml
+```
+
+Or, using the `implicit` commands:
+
+```
+$ kubectl create namespace dev
+```
+
+#### Additional namespace commands:
+
+```
+# Get pods from a specific namespace
+$ kubectl get pods --namespace=dev
+
+# Get pods from the default namespace
+$ kubectl get pods 
+
+# To set a specific namespace permanently instead of default namespace
+$ kubectl config set-context $(kubetl config current-context) --namespace=dev
+
+# To get the pods in all namespaces
+$ kubectl get pods --all-namespaces
+```
+
+#### How to Add Resource Limits to the Namespaces
+
+```
+# compute-quota.yaml
+
+apiVersion: v1
+kind: ResourceQuota
+metadata: 
+    name: compute-quota
+    namespace: dev
+spec:
+    hard:
+        pods: "10"
+        requests.cpu: "4"
+        requests.memory: 5Gi
+        limits.cpu: "10"
+        limits.memory: 10Gi
+```
+
+```
+$ kubectl create -f compute-quota.yaml
+```
+Get all namespaces
+
+```
+$ kubectl get namespaces
+
+NAME              STATUS   AGE
+default           Active   8m45s
+dev               Active   30s
+finance           Active   30s
+kube-node-lease   Active   8m45s
+kube-public       Active   8m45s
+kube-system       Active   8m46s
+manufacturing     Active   30s
+marketing         Active   30s
+prod              Active   30s
+research          Active   30s
+```
+
+```
+$ kubectl get pods --all-namespaces
+
+OR
+
+$ kubectl get pods -A
+```
+
+### Imperative and Declarative Commands
 
