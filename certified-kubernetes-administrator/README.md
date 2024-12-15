@@ -1530,3 +1530,25 @@ Reference:
 > Conventions: https://kubernetes.io/docs/reference/kubectl/conventions/
 
 -----
+
+### Kubectl Apply
+
+```
+kubectl apply -f nginx.yaml
+```
+
+There are three states for this `apply` command:
+
+- Local file
+- Live Object Configuration
+- Last Applied Configuration
+
+`Live Object configuration`, when the object is not available, it creates with the system fields.
+
+`Last applied configuration` - it's basically to understand what fields were removed.
+
+Here you go, refer to this documentation - [Merging changes to primitive fields 
+](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/#merging-changes-to-primitive-fields)
+
+
+Where is this `Last applied configuration` stored? It is stored in the `annotions` under the `metadata` property which names `last-applied-configuration`.
