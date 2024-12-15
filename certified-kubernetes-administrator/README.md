@@ -1593,7 +1593,7 @@ Example scenario:
 
 An `nginx` pod is already created and we need to add a `binding object` to allocate the pod to a Node `node02`.
 
-```
+```yaml
 # pod-definition.yaml
 
 apiVersion: v1
@@ -1610,7 +1610,7 @@ spec:
             - containerPort: 80
 ```
 
-```
+```yaml
 # pod-bind-definition.yaml
 
 apiVersion: v1
@@ -1623,4 +1623,8 @@ target:
     name: node02
 ```
 
+Now, finally run a `POST` request:
 
+```bash
+curl --header "Content-Type:application/json" --request POST --data '{"apiVersion":"v1", "kind":"Binding", ...}' http://$SERVER/api/v1/namespaces/default/pods/$PODNAME/binding/
+```
