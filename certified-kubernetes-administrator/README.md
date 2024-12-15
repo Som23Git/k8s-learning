@@ -1530,3 +1530,101 @@ Reference:
 > Conventions: https://kubernetes.io/docs/reference/kubectl/conventions/
 
 -----
+
+### Kubectl Apply
+
+```
+kubectl apply -f nginx.yaml
+```
+
+There are three states for this `apply` command:
+
+- Local file
+- Live Object Configuration
+- Last Applied Configuration
+
+`Live Object configuration`, when the object is not available, it creates with the system fields.
+
+`Last applied configuration` - it's basically to understand what fields were removed.
+
+Here you go, refer to this documentation - [Merging changes to primitive fields 
+](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/#merging-changes-to-primitive-fields)
+
+
+Where is this `Last applied configuration` stored? It is stored in the `annotions` under the `metadata` property which names `last-applied-configuration`.
+
+From kodekloudhub: 
+
+We have created a repository with notes, links to documentation, and answers to practice questions here. Please make sure to go through these as you progress through the course:
+
+https://github.com/kodekloudhub/certified-kubernetes-administrator-course
+
+----
+
+### Scheduling Section Introduction
+
+#### Manual Scheduling
+
+Different way to Manually scheduling a pod on a node.
+
+
+#### How scheduling works?
+
+Usually `nodeName` field is not set in the `pod-definition.yaml`, but k8s adds it automatically. This is important to `Bind` the `pod`.
+
+[1] The scheduler goes through all the pods and identifies all the pods where the `nodeName` parameter is NOT SET. Those are the candidates for scheduling.
+[2] Once identifies those pods, it schedules the pod to a Node. By setting the `nodeName` to that pod.
+[3] Basically, it is called `Binding` where, it binds the pod to a node by creating a `binding object`.
+
+
+If there are `no scheduler` or if you do not want to use the `built-in scheduler` and you want allocate the pods to the nodes, then we need to manually bind the pod to the nodes.
+
+Also, if the pods are NOT scheduled to a specific state, the pods continues to be in a `PENDING` state.
+
+Without a scheduler, the easiest way to schedule the pod to a node is to add the `nodeName` field/parameter/property to the `pod-definition.yaml` file while creating the pod itself.
+
+> [!Note] You cannot modify or add the `nodeName` field/parameter/property when the pod is already created.
+
+#### What if the pod is already created and assign the pod to a NODE?
+
+A way to create assign a node to an existing pod is to create a binding object `pod-bind-definition.yaml` and in the binding object, you point to a target node parameter called `target.kind`, `target.name`, and `target.apiVersion` and then run a post request.
+
+Example scenario: 
+
+An `nginx` pod is already created and we need to add a `binding object` to allocate the pod to a Node `node02`.
+
+```yaml
+# pod-definition.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+    name: nginx
+    labels:
+        app: nginx
+spec:
+    containers:
+        - image: nginx
+          name: nginx
+          ports:
+            - containerPort: 80
+```
+
+```yaml
+# pod-bind-definition.yaml
+
+apiVersion: v1
+kind: Binding
+metadata:
+    name: nginx
+target:
+    apiVersion: v1
+    kind: Node
+    name: node02
+```
+
+Now, finally run a `POST` request:
+
+```bash
+curl --header "Content-Type:application/json" --request POST --data '{"apiVersion":"v1", "kind":"Binding", ...}' http://$SERVER/api/v1/namespaces/default/pods/$PODNAME/binding/
+```
