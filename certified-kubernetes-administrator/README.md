@@ -1628,3 +1628,41 @@ Now, finally run a `POST` request:
 ```bash
 curl --header "Content-Type:application/json" --request POST --data '{"apiVersion":"v1", "kind":"Binding", ...}' http://$SERVER/api/v1/namespaces/default/pods/$PODNAME/binding/
 ```
+
+> [!IMPORTANT] 
+> How will you run the above `curl` command?
+> basically, the `$SERVER` is `kube-proxy` so you can start the server by running `kubectl kube-proxy` in a separate terminal so that it gives you a SERVER Endpoint
+> like `127.0.0.1:8001``
+> And, for `$PODNAME`, you can add it as an environmental variable or, can add the podname directly.
+> 
+> Create a `pod-binding.json` file:
+> ```json
+> {
+>  "apiVersion": "v1",
+>  "kind": "Binding",
+>  "metadata": {
+>    "name": "nginx"
+> },
+>  "target": {
+>    "apiVersion": "v1",
+>    "kind": "Node",
+>    "name": "controlplane"
+> }
+> }
+>
+> ```
+> In the end, the request looks like this:
+> ```
+> curl --header "Content-Type:application/json" --request POST --data @pod-binding.json http://127.0.0.1:8001/api/v1/namespaces/default/pods/nginx/binding/
+> ```
+> 
+> ```json
+> # Output looks like this:
+> {
+>   "kind": "Status",
+>   "apiVersion": "v1",
+>   "metadata": {},
+>   "status": "Success",
+>   "code": 201
+> }
+> ```
