@@ -1631,9 +1631,10 @@ curl --header "Content-Type:application/json" --request POST --data '{"apiVersio
 
 > [!IMPORTANT] 
 > How will you run the above `curl` command?
-> basically, the `$SERVER` is `kube-proxy` so you can start the server by running `kubectl kube-proxy` in a separate terminal so that it gives you a SERVER Endpoint
-> like `127.0.0.1:8001``
+> basically, the `$SERVER` is `kube-proxy` so you can start the server by running `kubectl proxy` in a separate terminal so that it gives you a SERVER Endpoint
+> like `127.0.0.1:8001`
 > And, for `$PODNAME`, you can add it as an environmental variable or, can add the podname directly.
+> Refer to this [K8s official documentation](https://kubernetes.io/docs/tutorials/kubernetes-basics/explore/explore-intro/#:~:text=new%20terminal%2C%20run%3A-,kubectl%20proxy,-Now%20again%2C%20we%27ll)
 > 
 > Create a `pod-binding.json` file:
 > ```json
