@@ -545,15 +545,15 @@ The `selectors` are NOT mandatory for the replication controllers but, it is man
 
 Commands used here:
 ```
-kubectl create -f replicaset-definition.yaml
+$ kubectl create -f replicaset-definition.yaml
 
-kubectl get replicaset
+$ kubectl get replicaset
 
-kubectl delete <replicaset_name>     ---- This deletes all the pods underlying the replicasets
+$ kubectl delete <replicaset_name>     ----> This deletes all the pods underlying the replicasets
 
-kubectl replace -f replicaset-definition.yml
+$ kubectl replace -f replicaset-definition.yml     ---> This command will delete the pod and recreate it instead of we deleting once and creating it again.
 
-kubectl scale --replicas=6 -f replicaset.yml
+$ kubectl scale --replicas=6 -f replicaset.yml
 ```
 
 Below is the replicaset and replication controller yaml definition file:
@@ -653,7 +653,7 @@ app-replicaset-j99z5   1/1     Running   0          10s
 
 #### After Scaling:
 
-```
+```bash
 % kubectl scale --replicas=6 -f replicaset-definition.yaml 
 replicaset.apps/app-replicaset scaled
 
@@ -684,7 +684,7 @@ app-replicaset-j99z5   1/1     Running   0          3m25s
 
 #### Delete replicaset
 
-```
+```bash
 % kubectl get replicaset 
 NAME             DESIRED   CURRENT   READY   AGE
 app-replicaset   6         6         6       5m8s
@@ -706,7 +706,7 @@ As we mentioned above, deleting the `replicaset` will also delete the pods as yo
 
 #### Delete Replication Controller
 
-```
+```bash
 % kubectl get replicationcontroller
 NAME     DESIRED   CURRENT   READY   AGE
 app-rc   3         3         3       9m27s
@@ -725,7 +725,7 @@ Now, we created pods via the `replicaset` and `replicationcontroller` and delete
 
 #### Additional Commands:
 
-```
+```bash
 
 $ kubectl get pods - Lists all pods in the namespace.  
 $ kubectl get replicaset - Lists all ReplicaSets in the namespace.  
@@ -738,7 +738,7 @@ $ kubectl edit replicaset <replica-set-name> - Modifies a ReplicaSet in real-tim
 $ kubectl delete pods <pod-name-pattern> - Deletes pods matching a pattern.  
 $ kubectl scale replicaset <replica-set-name> --replicas=<number> - Scales the ReplicaSet to a specified number of replicas.  
 
-Then, to delete all the pod in one go:
+# Then, to delete all the pod in one go:
 
 $ kubectl delete pods --all
 $ kubectl delete pods -l <label-key>=<label-value>
@@ -763,11 +763,11 @@ $ kubectl get deploy - For deployments
 
 ### Deployments
 
-```
+```bash
 $ kubectl create -f deployment-definition.yaml
 deployment.apps/app-deployment created
 ```
-```
+```bash
 $ kubectl get all 
 
 NAME                                  READY   STATUS    RESTARTS   AGE
@@ -786,7 +786,7 @@ replicaset.apps/app-deployment-85489cdd5b   3         3         3       14s
 ```
 The deployment definition file, will automatically create the replicaset and the pods.
 
-```
+```yaml
 # deployment-definition.yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -808,7 +808,7 @@ spec:
       type: frontend
 ```
 
-```
+```bash
 # This explain command will be very handy:
 $ kubectl explain deployments
 
@@ -850,18 +850,18 @@ Commands you to run Rollout strategy:
 [1] Rolling update 
 [2] Recreate
 
-```
-kubectl create -f deployment-definition.yml
-kubectl get deployments
-kubectl apply -f deployment-definition.yml
-kubectl set image deployment/myapp-deployment nginx=nginx:1.9.1
-kubectl rollout status deployment/myapp-deployment
-kubectl rollout history deployment/myapp-deployment
-kubectl rollout undo deployment/myapp-deployment
-kubectl create -f deployment-definition.yml --record=true
+```bash
+$ kubectl create -f deployment-definition.yml
+$ kubectl get deployments
+$ kubectl apply -f deployment-definition.yml
+$ kubectl set image deployment/myapp-deployment nginx=nginx:1.9.1
+$ kubectl rollout status deployment/myapp-deployment
+$ kubectl rollout history deployment/myapp-deployment
+$ kubectl rollout undo deployment/myapp-deployment
+$ kubectl create -f deployment-definition.yml --record=true
 ```
 
-```
+```bash
 $ kubectl get pods -o wide
 
 NAME                                    READY   STATUS    RESTARTS      AGE   IP            NODE       NOMINATED NODE   READINESS GATES
@@ -1123,7 +1123,7 @@ There are three different types of Services:
 
 #### NodePort Service
 
-```
+```bash
 +-----------------------------------------------------------+
 |                       K8s Architecture                    |
 +-----------------------------------------------------------+
@@ -1173,12 +1173,12 @@ Now, when I curl from outside the VM i.e. from the internet, I should be able to
 > When I try to access the website URL: `192.168.49.2:30007`, I should be able to reach the nginx pod exposed via the `service port 80`.
 > Also, the NodePort service will automatically route the traffic between the pods within the same node or within the different nodes too. Basically, it act as a LoadBalancer and there is no need to specify or deploy it manually.
 
-####$ Example:
+#### Example:
 
 - Before creating the service:
 
 
-```
+```bash
 $ kubectl get all -o wide   
 
 NAME                 TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE   SELECTOR
@@ -1188,7 +1188,7 @@ service/kubernetes   ClusterIP      10.96.0.1       <none>        443/TCP       
 
 - Post creating the service using the below definition file:
 
-```
+```yaml
 # service-definition.yaml
 apiVersion: v1
 kind: Service
@@ -1206,12 +1206,12 @@ spec:
     app: prod-app
 ```
 
-```
+```bash
 $ kubectl create -f service-definition.yaml 
 service/nginx-service created
 ```
 
-```
+```bash
 $ kubectl get services -o wide
 NAME            TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE    SELECTOR
 hello-node      LoadBalancer   10.103.22.214   <pending>     8080:31963/TCP   46d    k8s-app=hello-node
@@ -1227,7 +1227,7 @@ You can also use `minikube service <service-name> --url` to get the URL that you
 
 - LoadBalancer, it is basically the `NodePort` but it works well when using in the `GCP`, `AWS`, and `Azure` environment where it deploys the `LoadBalancer` in between the pods and the node(s).
 
-```
+```yaml
 # clusterip-service-definition.yaml
 apiVersion: v1
 kind: Service
@@ -1243,7 +1243,7 @@ spec:
   selector:
     app: prod-app
 ```
-```
+```yaml
 # loadbalancer-service-definition.yaml
 apiVersion: v1
 kind: Service
@@ -1262,7 +1262,7 @@ spec:
 ```
 when created the `service`, you can check the complete details using the `describe` service command:
 
-```
+```bash
 kubectl describe service <service_name>
 
 OR
@@ -1290,7 +1290,7 @@ Each of the namespaces can have the own `resource-limits` and `policies` so that
 
 To create namespace:
 
-```
+```yaml
 # namespace-dev.yaml
 apiVersion: v1
 kind: Namespace
@@ -1300,19 +1300,19 @@ metadata:
 
 Followed by:
 
-```
+```bash
 $ kubectl create -f namespace-dev.yaml
 ```
 
 Or, using the `implicit` commands:
 
-```
+```bash
 $ kubectl create namespace dev
 ```
 
 #### Additional namespace commands:
 
-```
+```bash
 # Get pods from a specific namespace
 $ kubectl get pods --namespace=dev
 
@@ -1328,7 +1328,7 @@ $ kubectl get pods --all-namespaces
 
 #### How to Add Resource Limits to the Namespaces
 
-```
+```yaml
 # compute-quota.yaml
 
 apiVersion: v1
@@ -1345,12 +1345,12 @@ spec:
         limits.memory: 10Gi
 ```
 
-```
+```bash
 $ kubectl create -f compute-quota.yaml
 ```
 Get all namespaces
 
-```
+```bash
 $ kubectl get namespaces
 
 NAME              STATUS   AGE
@@ -1366,7 +1366,7 @@ prod              Active   30s
 research          Active   30s
 ```
 
-```
+```bash
 $ kubectl get pods --all-namespaces
 
 OR
@@ -1379,7 +1379,7 @@ $ kubectl get pods -A
 There are different approaches to manage IaaC - Infrastructure as a code which are classified as `Imperative` and `Declarative`.
 
 #### Imperative Commands:
-```
+```bash
 ## Creating Objects
 $ kubectl run --image=nginx nginx
 $ kubectl create deployment --image=nginx nginx
@@ -1414,12 +1414,12 @@ From an exam perspective, it makes you faster. If you wanted to `edit` a deploym
 
 Using the same configuration file, you can run the declarative way:
 
-```
+```bash
 ## Create Objects
 $ kubectl apply -f nginx.yaml
 ```
 
-```
+```bash
 ## Update Objects
 $ kubectl apply -f nginx.yaml
 ```
@@ -1446,13 +1446,13 @@ Use the above two in combination to generate a resource definition file quickly 
 #### POD
 
 Create an NGINX Pod
-```
+```bash
 $ kubectl run nginx --image=nginx
 ```
 
 Generate POD Manifest YAML file (-o yaml). Don’t create it(–dry-run)
 
-```
+```bash
 $ kubectl run nginx --image=nginx --dry-run=client -o yaml
 ```
 
@@ -1460,30 +1460,30 @@ $ kubectl run nginx --image=nginx --dry-run=client -o yaml
 
 Create a deployment
 
-```
+```bash
 $ kubectl create deployment --image=nginx nginx
 ```
 
 Generate Deployment YAML file (-o yaml). Don’t create it(–dry-run)
 
-```
+```bash
 $ kubectl create deployment --image=nginx nginx --dry-run=client -o yaml
 ```
 Generate Deployment with 4 Replicas
 
-```
+```bash
 $ kubectl create deployment nginx --image=nginx --replicas=4
 ```
 You can also scale a deployment using the scale command:
-```
+```bash
 $ kubectl scale
 ```
-```
+```bash
 $ kubectl scale deployment nginx--replicas=4
 ```
 Another way to do this `is to save the YAML` definition to a file and modify
 
-```
+```bash
 $ kubectl create deployment nginx --image=nginx --dry-run=client -o yaml > nginx-deployment.yaml
 ```
 You can then update the YAML file with the replicas or any other field before creating the deployment.
@@ -1491,7 +1491,7 @@ You can then update the YAML file with the replicas or any other field before cr
 #### Service
 
 Create a Service named `redis-service` of type `ClusterIP` to expose pod `redis` on port `6379`
-```
+```bash
 $ kubectl expose pod redis --port=6379 --name redis-service --dry-run=client -o yaml
 ```
 
@@ -1499,28 +1499,28 @@ $ kubectl expose pod redis --port=6379 --name redis-service --dry-run=client -o 
 
 Or
 
-```
+```bash
 $ kubectl create service clusterip redis --tcp=6379:6379 --dry-run=client -o yaml 
 ```
 **_(This will not use the pods labels as selectors, instead, it will assume selectors as app=redis. You cannot pass in selectors as an option. So, it does not work very well if your pod has a different label set. So, generate the file and modify the selectors before creating the service)_**
 
 Create a Service named `nginx` of type `NodePort` to expose pod nginx’s port `80` on port `30080` on the nodes:
 
-```
+```bash
 $ kubectl expose pod nginx --type=NodePort --port=80 --name=nginx-service --dry-run=client -o yaml
 ```
 **_(This will automatically use the pod’s labels as selectors, but you cannot specify the node port. You have to generate a definition file and then add the node port manually before creating the service with the pod.)_**
 
 Or
 
-```
+```bash
 $ kubectl create service nodeport nginx --tcp=80:80 --node-port=30080 --dry-run=client -o yaml
 ```
 **_(This will not use the pod labels as selectors.)_**
 
 Both the above commands have their own challenges. While one of them cannot accept a selector, the other cannot accept a node port. I would recommend going with the
 
-```
+```bash
 $ kubectl expose
 ```
 command. If you need to specify a node port, generate a definition file using the same command and manually input the nodeport before creating the service.
@@ -1533,7 +1533,7 @@ Reference:
 
 ### Kubectl Apply
 
-```
+```bash
 kubectl apply -f nginx.yaml
 ```
 
@@ -1667,3 +1667,6 @@ curl --header "Content-Type:application/json" --request POST --data '{"apiVersio
 >   "code": 201
 > }
 > ```
+
+### Labels and Selectors
+
