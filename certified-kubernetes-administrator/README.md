@@ -1651,6 +1651,8 @@ curl --header "Content-Type:application/json" --request POST --data '{"apiVersio
 > }
 > }
 >
+> # Please note, you would need to pass the JSON format as above and NO Flattened JSON format is accepted or recognized.
+>
 > ```
 > In the end, the request looks like this:
 > ```
@@ -1668,5 +1670,73 @@ curl --header "Content-Type:application/json" --request POST --data '{"apiVersio
 > }
 > ```
 
+----
+
 ### Labels and Selectors
+
+#### What is Labels and Selectors in General in K8s?
+
+It is standard method to group things together i.e. pods, replicasets, services as such. It is basically filtering the specific pods in midst of 100s of pods. 
+
+Labels are the properties that are attached to an object and the Selectors are the one that selects i.e. it filters among other objects.
+
+To use `Selector` to filter the pods(can filter other objects too):
+
+```bash
+$ kubectl get pods --selector app=App1
+
+$ kubectl get pods --selector env=prod,bu=finance,tier=frontend
+```
+
+> [!TIP] As there could be many pods, you can count the pods using the `wordcount` command i.e. `wc`. Also, use `--no-headers` to remove the headers.
+> ```bash
+> kubectl get pods --selector env=dev --no-headers | wc -l
+> ```
+
+####  Annotations
+
+It records the details of the replicaset like the `buildversion`, `last_configured_options` and so on.
+
+---
+
+### Taints and Tolerations
+
+Concepts of Taints and Tolerations
+
+- Taints are set on Nodes
+- Tolerations are set on Pods
+
+#### How can we `Taint` a Node?
+
+```bash
+$ kubectl taint nodes node-name key=value:taint-effect
+```
+#### What is taint-effect?
+
+It is the option that we tell the Node that `What happens to PODs that do not tolerate this taint`.
+
+There are three options of `taint-effect`:
+* NoSchedule
+* PreferNoSchedule
+* NoExecute
+
+- NoExecute:
+This affects pods that are already running on the node as follows:
+Pods that do not tolerate the taint are evicted immediately
+Pods that tolerate the taint without specifying tolerationSeconds in their toleration specification remain bound forever
+Pods that tolerate the taint with a specified tolerationSeconds remain bound for the specified amount of time. After that time elapses, the node lifecycle controller evicts the Pods from the node.
+
+- NoSchedule:
+No new Pods will be scheduled on the tainted node unless they have a matching toleration. Pods currently running on the node are not evicted.
+
+- PreferNoSchedule:
+PreferNoSchedule is a "preference" or "soft" version of NoSchedule. The control plane will try to avoid placing a Pod that does not tolerate the taint on the node, but it is not guaranteed.
+
+Please refer to this [Taint-effect in K8s documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/#:~:text=The%20allowed%20values,is%20not%20guaranteed.)
+
+```bash
+$ kubectl taint nodes node1 app=blue:NoSchedule
+```
+
+#### How can we apply `Tolerations` to a Pod?
 
