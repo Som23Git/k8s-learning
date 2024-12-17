@@ -1711,7 +1711,7 @@ Concepts of Taints and Tolerations
 ```bash
 $ kubectl taint nodes node-name key=value:taint-effect
 ```
-#### What is taint-effect?
+#### What is `taint-effect`?
 
 It is the option that we tell the Node that `What happens to PODs that do not tolerate this taint`.
 
@@ -1739,4 +1739,40 @@ $ kubectl taint nodes node1 app=blue:NoSchedule
 ```
 
 #### How can we apply `Tolerations` to a Pod?
+
+To add a Toleration to a pod:
+
+```yaml
+#pod-definition.yaml
+
+apiVersion: v1
+kind: Pod
+metadata: 
+    name: nginx
+    labels:
+        app: blue
+spec:
+    containers:
+        - image: nginx
+          name: nginx
+          ports:
+            - containerPort: 8080
+    tolerations:
+        - key: "app"
+          operator: "Equal"
+          value: "blue"
+          effect: "NoSchedule"
+
+```
+
+You can check this Taints and Tolerations in a `Minikube` cluster because, in the Minikube cluster, the `Master` node does not have any taints and it is the only one that is available to host the pods so, the `scheduler` assigns the pods to the master node. 
+
+But, in a `K8s cluster`(NOT minikube), you will be able to notice that the `Master` node is protected by a `Taint` because, it strictly tells the `scheduler` to NOT schedule pods on the Master node.
+
+You can use this command to understand where there is any Taint in the `kubemaster`:
+
+```bash
+$ kubectl describe node kubemaster | grep Taint
+```
+
 
