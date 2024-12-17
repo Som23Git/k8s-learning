@@ -1775,4 +1775,88 @@ You can use this command to understand where there is any Taint in the `kubemast
 $ kubectl describe node kubemaster | grep Taint
 ```
 
+To remove the `Taint` from the node, we can use the below command:
+
+```bash
+$ kubectl taint node controlplane node-role.kuberentes.io/master:NoSchedule-
+```
+
+The minus(-) in the end of the above command removes the taint.
+
+Here is the [official documentation on the Taint removal](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/#:~:text=To%20remove%20the%20taint%20added%20by%20the%20command%20above%2C%20you%20can%20run%3A)
+
+----
+
+### Node Selectors
+
+Let's start with `Label the Nodes`, without labelling the nodes it is NOT possible to have the `nodeSelector` in the `pod-definition.yaml` file.
+
+```bash
+$ kubectl label nodes <node-name> <label-key>=<label-value>
+
+$ kubectl label nodes node-1 size=large
+```
+
+Now, we can label the node in the pod-definition.yaml file.
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata: 
+    name: nginx
+    labels:
+        app: nodejs
+        env: dev
+spec:
+    containers:
+        - image: nginx
+          name: nginx
+    nodeSelector:
+          size: Large       ## nodeSelector Label that we named in the node above.
+```
+
+#### Limitation of using the Node Selector property:
+
+- Can use only label i.e. single label. You cannot give any combinations like 
+    `can you select a Medium node or Large node, if the Large node is unavailable`
+    `do not select the small node`
+
+To overcome this Limitations, the `nodeAffinity` and the `antiAffinity` was developed.
+
+----
+
+### Node Affinity
+
+It provides advanced configuration and capabilities to place pods in the nodes that we want and more flexible but, this is complex as it looks.
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: with-node-affinity
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: topology.kubernetes.io/zone
+            operator: In
+            values:
+            - antarctica-east1
+            - antarctica-west1
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 1
+        preference:
+          matchExpressions:
+          - key: another-node-label-key
+            operator: In
+            values:
+            - another-node-label-value
+  containers:
+  - name: with-node-affinity
+    image: registry.k8s.io/pause:2.0
+```
+
+You can find the above node-affinity.yaml file in the [official K8s documentation.](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/#:~:text=To%20remove%20the%20taint%20added%20by%20the%20command%20above%2C%20you%20can%20run%3A)
 
