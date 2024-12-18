@@ -1796,6 +1796,7 @@ $ kubectl label nodes <node-name> <label-key>=<label-value>
 
 $ kubectl label nodes node-1 size=large
 ```
+Please note, if there are existing labels in the node, the new label(s) that you add will be appended to existing labels.
 
 Now, we can label the node in the pod-definition.yaml file.
 
@@ -1820,6 +1821,7 @@ spec:
 - Can use only label i.e. single label. You cannot give any combinations like 
     `can you select a Medium node or Large node, if the Large node is unavailable`
     `do not select the small node`
+- Basically, it cannot perform advanced operations or conditions like `OR` or `NOT` operator.
 
 To overcome this Limitations, the `nodeAffinity` and the `antiAffinity` was developed.
 
@@ -1830,6 +1832,66 @@ To overcome this Limitations, the `nodeAffinity` and the `antiAffinity` was deve
 It provides advanced configuration and capabilities to place pods in the nodes that we want and more flexible but, this is complex as it looks.
 
 ```yaml
+# Example correlating the above nodeSelector: size - Large
+
+apiVersion: v1
+kind: Pod
+metadata: 
+    name: nginx
+    labels:
+        app: nodejs
+        env: dev
+spec:
+    containers:
+        - image: nginx
+          name: nginx
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+              - key: size
+                operator: In        # NotIn or Exists(does not compare the values)
+                values:
+                - Large
+                - Medium
+```
+Adding the same thing in `json` to cross-check:
+
+```json
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "nginx",
+    "labels": {
+      "app": "nodejs",
+      "env": "dev"
+    }
+  },
+  "spec": {
+    "containers": [
+      {
+        "image": "nginx",
+        "name": "nginx"
+      }
+    ],
+    "affinity": {
+      "nodeAffinity": {
+        "requiredDuringSchedulingIgnoredDuringExecution": {
+          "nodeSelectorTerms": [
+            {
+              "matchExpressions": [{"key": "size","operator": "In","value": ["Large","Medium"]}]
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+```
+```yaml
+# Example from the K8s documentation
 apiVersion: v1
 kind: Pod
 metadata:
@@ -1859,4 +1921,79 @@ spec:
 ```
 
 You can find the above node-affinity.yaml file in the [official K8s documentation.](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/#:~:text=To%20remove%20the%20taint%20added%20by%20the%20command%20above%2C%20you%20can%20run%3A)
+
+#### Node Affinity Types
+
+This Node Affinity types defines the behaviour of the scheduler and checks during the lifecycle of the pod.
+
+There are two types of Node Affinity available:
+
+- `requiredDuringSchedulingIgnoredDuringExecution`
+- `preferredDuringSchedulingIgnoredDuringExecution`
+
+There are Two states of the lifecycle of the pods:
+
+- During scheduling
+- During execution
+
+- During scheduling
+
+There are just two usecases:
+
+* If the Node Affinity is set to `requiredDuringSchedulingIgnoredDuringExecution`, 
+
+And, the label is `NOT` set to the nodes, then the pod will be stuck in the `Pending` state without scheduling the pods to a specific node as all the nodes does not have a label.
+
+But, if a label is set to a node, then the pod will be placed accordingly.
+
+* If the Node Affinity is set to `preferredDuringSchedulingIgnoredDuringExecution`,
+
+If the label is `NOT` set to the nodes, then the pod will still be placed on the nodes that does not have the labels, as it is `preferred` and NOT `required` which makes it mandatory to schedule. This will place the pod on any available nodes.
+
+- During Execution:
+
+If the `label` is removed from the node once the pods are placed or while running, the pods will continue to run without getting impacted by this change.
+
+To address this `feature gap`, the `K8s` community is working two more `Node Affinity types`, that are:
+
+- `requiredDuringSchedulingRequiredDuringExecution`
+- `preferredDuringSchedulingRequiredDuringExecution`
+
+So basically, this addresses during the pod during the `Execution` as well.
+
+## Example exercise - Practice Test - Node Affinity:
+
+```yaml
+## $ cat deployment_red.yaml 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blue
+spec:
+  selector:
+    matchLabels:
+      name: blue
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        name: blue
+    spec:
+      containers:
+        - name: nginx-container
+          image: nginx
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: color
+                  operator: In        # NotIn or Exists(does not compare the values)
+                  values:
+                  - blue
+                  
+```
+
+-----
+
 
