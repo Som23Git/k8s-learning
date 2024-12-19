@@ -1962,7 +1962,7 @@ To address this `feature gap`, the `K8s` community is working two more `Node Aff
 So basically, this addresses during the pod during the `Execution` as well.
 
 ## Example exercise - Practice Test - Node Affinity:
-
+ 
 ```yaml
 ## $ cat deployment_red.yaml 
 apiVersion: apps/v1
@@ -1993,7 +1993,189 @@ spec:
                   - blue
                   
 ```
+To quickly edit the deployment definition file, we can use `vi` editor.
 
+```bash
+# To edit multiple occurences of a single word:
+
+:%s/old_word/new_word/g
+
+# Taking for example, let's we need to change the string `blue` in the above deployment-definition.yaml file to `red`
+
+:%s/blue/red/g
+```
 -----
 
+### Resource Limits
 
+```yaml
+# pod-definition.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-nginx
+  labels:
+    type: frontend
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      ports: 
+      - containerPort: 8080
+      resources:
+        requests:
+          memory: "1Gi"
+          cpu: 1
+        limits:
+          memory: "2Gi"
+          cpu: 2
+```
+
+OOM Limit hit: Out-of-Memory
+
+Default Behavior:
+
+
+CPU Behavior:
+No Requests and No Limits
+
+No Requests and Have Limits
+
+Have Limits and Have Requests
+
+Have Requests and No Limits - This is most ideal setup that allows the other pods to use the vCPUs.
+
+Memory Behavior:
+
+No Requests and No Limits
+
+No Requests and Have Limits
+
+Have Limits and Have Requests
+
+Have Requests and No Limits - This is most ideal setup that allows the other pods to use the memory.
+
+#### LimitRange
+
+[LimitRange K8s Doc](https://kubernetes.io/docs/concepts/policy/limit-range/)
+
+##### For CPU
+```yaml
+# limit-range-cpu.yaml
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: cpu-resource-constraint
+spec:
+  limits:
+  - default:
+      cpu: 500m
+    defaultRequest:
+      cpu: 500m
+    max: 
+      cpu: "1"
+    min:
+      cpu: 100m
+    type: Container
+```
+
+##### For Memory
+
+```yaml
+# limit-range-memory.yaml
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: memory-resource-constraint
+spec:
+  limits:
+  - default:
+      memory: 1Gi
+    defaultRequest:
+      memory: 1Gi
+    max: 
+      memory: 1Gi
+    min:
+      memory: 500Mi
+    type: Container
+```
+#### Resource Quota
+
+[Resource Quota K8s Official Doc](https://kubernetes.io/docs/concepts/policy/resource-quotas/)
+
+
+This is the best method to follow and allocate the right set of resources to all the pods.
+
+```yaml
+# resource-quota.yaml
+
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: my-resource-quota
+spec:
+  hard:
+    requests:
+      cpu: 4
+      memroy: 4Gi
+    limits:
+      cpu: 10
+      memory: 10Gi
+```
+
+------
+
+## Important Tip
+
+#### To Edit a POD
+Remember, you CANNOT edit specifications of an existing POD other than the below.
+
+```bash
+spec.containers[*].image
+spec.initContainers[*].image
+spec.activeDeadlineSeconds
+spec.tolerations
+```
+For example, you cannot edit the environment variables, service accounts, and resource limits (all of which we will discuss later) of a running pod. But if you really want to, you have 2 options:
+
+1. Run the `kubectl edit pod`  command. This will open the pod specification in an editor (vi editor). Then edit the required properties. When you try to save it, you will be denied. This is because you are attempting to edit a field on the pod that is not editable.
+
+![vi_editing_pod_definition](vi_editing_pod_definition.png)
+![unable_to_save_pod](unable_to_save_pod.png)
+
+A copy of the file with your changes is saved in a temporary location as shown above.
+
+You can then delete the existing pod by running the command:
+```bash
+$ kubectl delete pod webapp
+```
+Then create a new pod with your changes using the temporary file
+
+```bash
+$ kubectl create -f /tmp/kubectl-edit-ccvrq.yaml
+```
+
+2. The second option is to extract the pod definition in YAML format to a file using the command
+```bash
+$ kubectl get pod webapp -o yaml >&nbsp;my-new-pod.yaml
+```
+Then make the changes to the exported file using an editor (vi editor). Save the changes
+```bash
+$ vi my-new-pod.yaml
+```
+Then delete the existing pod
+```bash
+$ kubectl delete pod webapp
+```
+Then create a new pod with the edited file
+```bash
+$ kubectl create -f my-new-pod.yaml
+```
+Edit Deployments
+
+With Deployments, you can easily edit any field/property of the POD template. Since the pod template is a child of the deployment specification, with every change the deployment will automatically delete and create a new pod with the new changes. So if you are asked to edit a property of a POD part of a deployment you may do that simply by running the command
+```bash
+$ kubectl edit deployment my-deployment
+```
+-----
