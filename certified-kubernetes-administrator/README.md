@@ -1962,7 +1962,7 @@ To address this `feature gap`, the `K8s` community is working two more `Node Aff
 So basically, this addresses during the pod during the `Execution` as well.
 
 ## Example exercise - Practice Test - Node Affinity:
-
+ 
 ```yaml
 ## $ cat deployment_red.yaml 
 apiVersion: apps/v1
@@ -1993,7 +1993,135 @@ spec:
                   - blue
                   
 ```
+To quickly edit the deployment definition file, we can use `vi` editor.
 
+```bash
+# To edit multiple occurences of a single word:
+
+:%s/old_word/new_word/g
+
+# Taking for example, let's we need to change the string `blue` in the above deployment-definition.yaml file to `red`
+
+:%s/blue/red/g
+```
 -----
 
+### Resource Limits
 
+```yaml
+# pod-definition.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-nginx
+  labels:
+    type: frontend
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      ports: 
+      - containerPort: 8080
+      resources:
+        requests:
+          memory: "1Gi"
+          cpu: 1
+        limits:
+          memory: "2Gi"
+          cpu: 2
+```
+
+OOM Limit hit: Out-of-Memory
+
+Default Behavior:
+
+
+CPU Behavior:
+No Requests and No Limits
+
+No Requests and Have Limits
+
+Have Limits and Have Requests
+
+Have Requests and No Limits - This is most ideal setup that allows the other pods to use the vCPUs.
+
+Memory Behavior:
+
+No Requests and No Limits
+
+No Requests and Have Limits
+
+Have Limits and Have Requests
+
+Have Requests and No Limits - This is most ideal setup that allows the other pods to use the memory.
+
+#### LimitRange
+
+[LimitRange K8s Doc](https://kubernetes.io/docs/concepts/policy/limit-range/)
+
+##### For CPU
+```yaml
+# limit-range-cpu.yaml
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: cpu-resource-constraint
+spec:
+  limits:
+  - default:
+      cpu: 500m
+    defaultRequest:
+      cpu: 500m
+    max: 
+      cpu: "1"
+    min:
+      cpu: 100m
+    type: Container
+```
+
+##### For Memory
+
+```yaml
+# limit-range-memory.yaml
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: memory-resource-constraint
+spec:
+  limits:
+  - default:
+      memory: 1Gi
+    defaultRequest:
+      memory: 1Gi
+    max: 
+      memory: 1Gi
+    min:
+      memory: 500Mi
+    type: Container
+```
+#### Resource Quota
+
+[Resource Quota K8s Official Doc](https://kubernetes.io/docs/concepts/policy/resource-quotas/)
+
+
+This is the best method to follow and allocate the right set of resources to all the pods.
+
+```yaml
+# resource-quota.yaml
+
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: my-resource-quota
+spec:
+  hard:
+    requests:
+      cpu: 4
+      memroy: 4Gi
+    limits:
+      cpu: 10
+      memory: 10Gi
+```
+
+------
