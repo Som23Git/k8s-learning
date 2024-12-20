@@ -2275,7 +2275,7 @@ staticPodPath: /etc/kubernetes/manifests
 
 The static pods are created because it does not need other component involvements except the `kubelet` itself. It's very straightforward, once you create a static pod using the directory where the `manifests` file are added, the `kubelet service` will take care of those pods.
 
-StaticPods vs DaemonSets
+#### StaticPods vs DaemonSets
 
 | Static Pods  | DaemonSets |
 |---|---|
