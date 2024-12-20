@@ -2225,3 +2225,60 @@ How does the daemonsets schedules pods in each node correctly?
 Until `v1.12`, the daemonsets were scheduled on the nodes using the node Labels but, post K8s `v1.12`, the daemonsets started using the `nodeAffinity` so that it gets scheduled each nodes appropriately without overlapping with eachother.
 
 #### Static Pods
+
+You have only kubelet and the containerD runtime interface
+
+```
+/etc/kubernetes/manifests
+```
+
+It could be any directory path, that you can set the `kubelet` to take but, you would need to pass that PATH before the `kubelet` service is deployed.
+
+
+```bash
+# kubelet.service
+
+ExecStart=/usr/local/bin/kubelet \\
+  --container-runtime=remote \\
+  --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock \\
+  --pod-manifest-path=/etc/kubernetes/manifests \\  <-------------> directory path
+  --kubeconfig=/var/lib/kubelet/kubeconfig \\
+  --network-plugin=cni \\
+  --register-node=true \\
+  --v=2
+```
+
+Instead of directly providing the path to the directory in the service file, we can also provide a `config` option and point to a `config.yaml` file.
+
+```bash
+# kubelet.service
+
+ExecStart=/usr/local/bin/kubelet \\
+  --container-runtime=remote \\
+  --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock \\
+  --config=kubeconfig.yaml  \\            <-----------------> This is where you place the definition files in the static pods
+  --kubeconfig=/var/lib/kubelet/kubeconfig \\
+  --network-plugin=cni \\
+  --register-node=true \\
+  --v=2
+```
+
+And, then:
+
+```bash
+# kubeconfig.yaml
+
+staticPodPath: /etc/kubernetes/manifests
+```
+
+#### Why one would want to use Static Pods?
+
+The static pods are created because it does not need other component involvements except the `kubelet` itself. It's very straightforward, once you create a static pod using the directory where the `manifests` file are added, the `kubelet service` will take care of those pods.
+
+StaticPods vs DaemonSets
+
+| Static Pods  | DaemonSets |
+|---|---|
+|  Created by Kubelet | Created by Kube-API server(DaemonSet Controller)  |
+| Deploy Control Plane components as Static Pods  | Deploy Monitoring Agents, Logging Agents on nodes  |
+| Ignored by Kube-Scheduler  | Ignored by Kube-Scheduler  |
