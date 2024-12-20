@@ -2179,3 +2179,49 @@ With Deployments, you can easily edit any field/property of the POD template. Si
 $ kubectl edit deployment my-deployment
 ```
 -----
+
+### Daemon Sets
+
+
+Creating a `DaemonSet-definition.yaml` is same as `Replicaset-definition.yaml`
+
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: monitoring-daemon
+spec:
+  selector:
+    matchLabels:
+      app: monitoring-agent
+  template:
+    metadata:
+      labels:
+        app: monitoring-agent
+    spec:
+      containers:
+      - name: monitoring-agent
+        image: monitoring-agent
+```
+```bash
+$ kubectl create -f daemon-set-definition.yaml
+```
+To view DaemonSets
+
+```bash
+$ kubectl get daemonsets
+```
+
+To describe DaemonSets
+
+```bash
+$ kubectl describe daemonsets monitoring-daemon
+```
+
+#### How does it work?
+
+How does the daemonsets schedules pods in each node correctly? 
+
+Until `v1.12`, the daemonsets were scheduled on the nodes using the node Labels but, post K8s `v1.12`, the daemonsets started using the `nodeAffinity` so that it gets scheduled each nodes appropriately without overlapping with eachother.
+
+#### Static Pods
