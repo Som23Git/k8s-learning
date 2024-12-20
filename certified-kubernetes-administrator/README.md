@@ -2224,7 +2224,9 @@ How does the daemonsets schedules pods in each node correctly?
 
 Until `v1.12`, the daemonsets were scheduled on the nodes using the node Labels but, post K8s `v1.12`, the daemonsets started using the `nodeAffinity` so that it gets scheduled each nodes appropriately without overlapping with eachother.
 
-#### Static Pods
+----
+
+### Static Pods
 
 You have only kubelet and the containerD runtime interface
 
