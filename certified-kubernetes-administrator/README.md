@@ -2391,9 +2391,9 @@ volumeStatsAggPeriod: 0s
 ```
 
 :rotating_light: 
->[!Important - Note 1] The moment you create an place a pod yaml in the above `staticPodPath` i.e. `/etc/kubernetes/manifests`, the pod will be created by the `kubelet` automatically and you don't have to run it manually.
+> [!Important - Note 1] The moment you create an place a pod yaml in the above `staticPodPath` i.e. `/etc/kubernetes/manifests`, the pod will be created by the `kubelet` automatically and you don't have to run it manually.
 
->[!Important - Note 2] Please note, the `kubelet` are deployed as a `daemonsets` in each nodes, let it be `controlplane` or `node01` or `N Node...`. So, basically, each `kubelet` can have its own `staticPodPath` and it will NOT be the same for each nodes. So, makesure, you `ssh` each node and understand where the `kubelet- staticPodPath` is pointing to and then, delete or create static pods in that directory.
+> [!Important - Note 2] Please note, the `kubelet` are deployed as a `daemonsets` in each nodes, let it be `controlplane` or `node01` or `N Node...`. So, basically, each `kubelet` can have its own `staticPodPath` and it will NOT be the same for each nodes. So, makesure, you `ssh` each node and understand where the `kubelet- staticPodPath` is pointing to and then, delete or create static pods in that directory.
 
 #### How to quickly create a static Pod?
 
