@@ -2307,19 +2307,123 @@ Where, if you notice in the above image, you can see pods that ends with the nam
 - Second method, to identify whether the pod is a static pod, we can take a look at the `pod`'s yaml file and can check the property `ownerReferences` where, we can see the `Node` as `kind` instead of the `Pod` or the `ReplicaSet`.
 
 ```bash
-$ kubectl get pod coredns-746672781-brwnd -n kube-system -o yaml
+$ kubectl get pods kube-scheduler-controlplane -n kube-system -o yaml
+```
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+...
+  labels:
+    component: kube-scheduler
+    tier: control-plane
+  name: kube-scheduler-controlplane
+  namespace: kube-system
+  ownerReferences:
+  - apiVersion: v1
+    controller: true
+    kind: Node          <-------------> Pointing to a Node instead of ReplicaSet or Pod itself
+    name: controlplane
+    uid: cf893f58-3cbc-4544-be85-863dd43e5818
+spec:
+...
+...
+...
 ```
 
 - **_[Not Recommended Method, but can check]_** - Third method, is to check the `PATH` i.e. `/etc/kubernetes/manifests` whether the `yaml` files are available or no.
 
 #### How do you know what is the PATH of the directory holding the static pod definition files?
 
-You would need to look at the `kubelet.conf`: Where, do you find the `kubelet.conf`? You need to check the `/var/lib/kubelet/config.yaml` and find for property `staticPodPath` and it's value which is where, you have the static pods definition files.
+You would need to look at the `kubelet` configuration: Where, do you find the `kubelet` configuration file? You need to check the `/var/lib/kubelet/config.yaml` and find for property `staticPodPath` and it's value which is where, you have the static pods definition files.
+
+```yaml
+# $ cat  /var/lib/kubelet/config.yaml 
+apiVersion: kubelet.config.k8s.io/v1beta1
+authentication:
+  anonymous:
+    enabled: false
+  webhook:
+    cacheTTL: 0s
+    enabled: true
+  x509:
+    clientCAFile: /etc/kubernetes/pki/ca.crt
+authorization:
+  mode: Webhook
+  webhook:
+    cacheAuthorizedTTL: 0s
+    cacheUnauthorizedTTL: 0s
+cgroupDriver: cgroupfs
+clusterDNS:
+- 172.20.0.10
+clusterDomain: cluster.local
+containerRuntimeEndpoint: ""
+cpuManagerReconcilePeriod: 0s
+evictionPressureTransitionPeriod: 0s
+fileCheckFrequency: 0s
+healthzBindAddress: 127.0.0.1
+healthzPort: 10248
+httpCheckFrequency: 0s
+imageMaximumGCAge: 0s
+imageMinimumGCAge: 0s
+kind: KubeletConfiguration
+logging:
+  flushFrequency: 0
+  options:
+    json:
+      infoBufferSize: "0"
+    text:
+      infoBufferSize: "0"
+  verbosity: 0
+memorySwap: {}
+nodeStatusReportFrequency: 0s
+nodeStatusUpdateFrequency: 0s
+resolvConf: /run/systemd/resolve/resolv.conf
+rotateCertificates: true
+runtimeRequestTimeout: 0s
+shutdownGracePeriod: 0s
+shutdownGracePeriodCriticalPods: 0s
+staticPodPath: /etc/kubernetes/manifests      <-------------> StaticPodPath, pointing to the directory where the manifest files are stored.
+streamingConnectionIdleTimeout: 0s
+syncFrequency: 0s
+volumeStatsAggPeriod: 0s
+```
 
 :rotating_light: 
 >[!Important - Note 1] The moment you create an place a pod yaml in the above `staticPodPath` i.e. `/etc/kubernetes/manifests`, the pod will be created by the `kubelet` automatically and you don't have to run it manually.
 
 >[!Important - Note 2] Please note, the `kubelet` are deployed as a `daemonsets` in each nodes, let it be `controlplane` or `node01` or `N Node...`. So, basically, each `kubelet` can have its own `staticPodPath` and it will NOT be the same for each nodes. So, makesure, you `ssh` each node and understand where the `kubelet- staticPodPath` is pointing to and then, delete or create static pods in that directory.
+
+#### How to quickly create a static Pod?
+
+```bash
+$ kubectl run static-busybox --image=busybox --dry-run=client -o yaml --command -- sleep
+ 1000 >> static_pod.yaml
+```
+```
+# static_pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: static-busybox
+  name: static-busybox
+spec:
+  containers:
+  - command:
+    - sleep
+    - "1000"
+    image: busybox
+    name: static-busybox
+    resources: {}
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+status: {}
+```
+
+Place this `static_pod.yaml` in the staticPodPath - `/etc/kubernetes/manifests` and `kubelet` will immediately create a pod.
 
 ----
 
