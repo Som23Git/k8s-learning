@@ -2284,3 +2284,46 @@ The static pods are created because it does not need other component involvement
 |  Created by Kubelet | Created by Kube-API server(DaemonSet Controller)  |
 | Deploy Control Plane components as Static Pods  | Deploy Monitoring Agents, Logging Agents on nodes  |
 | Ignored by Kube-Scheduler  | Ignored by Kube-Scheduler  |
+
+
+#### How do you find a Static Pods in the midst of other pods?
+
+There are several ways to find the static pods:
+
+- We can check the pod names using the `kubectl get pods` command:
+
+![get pods](get-pods.png)
+
+Where, if you notice in the above image, you can see pods that ends with the name `*-controlplane` so basically, these are static pods because, the static pods gets suffix this in the end.
+
+```bash
+# Example: 
+* kube-apiserver-controlplane 
+* kube-controller-manager-controlplane
+* kube-scheduler-controlplane
+* etcd-controlplane
+```
+
+- Second method, to identify whether the pod is a static pod, we can take a look at the `pod`'s yaml file and can check the property `ownerReferences` where, we can see the `Node` as `kind` instead of the `Pod` or the `ReplicaSet`.
+
+```bash
+$ kubectl get pod coredns-746672781-brwnd -n kube-system -o yaml
+```
+
+- **_[Not Recommended Method, but can check]_** - Third method, is to check the `PATH` i.e. `/etc/kubernetes/manifests` whether the `yaml` files are available or no.
+
+#### How do you know what is the PATH of the directory holding the static pod definition files?
+
+You would need to look at the `kubelet.conf`: Where, do you find the `kubelet.conf`? You need to check the `/var/lib/kubelet/config.yaml` and find for property `staticPodPath` and it's value which is where, you have the static pods definition files.
+
+:rotating_light: 
+>[!Important - Note 1] The moment you create an place a pod yaml in the above `staticPodPath` i.e. `/etc/kubernetes/manifests`, the pod will be created by the `kubelet` automatically and you don't have to run it manually.
+
+>[!Important - Note 2] Please note, the `kubelet` are deployed as a `daemonsets` in each nodes, let it be `controlplane` or `node01` or `N Node...`. So, basically, each `kubelet` can have its own `staticPodPath` and it will NOT be the same for each nodes. So, makesure, you `ssh` each node and understand where the `kubelet- staticPodPath` is pointing to and then, delete or create static pods in that directory.
+
+----
+
+
+
+
+
