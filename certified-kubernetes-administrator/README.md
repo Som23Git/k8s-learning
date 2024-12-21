@@ -2427,6 +2427,55 @@ Place this `static_pod.yaml` in the staticPodPath - `/etc/kubernetes/manifests` 
 
 ----
 
+### Multiple Schedulers
+
+We know how the default `kube-scheduler` work, what if you need a separate `scheduler` that have its own conditions.
+
+You can create your `own custom scheduler` and instruct the `pod` or the `deployment` to make use of your `custom scheduler` instead of `default` one.
+
+You can find the `default` scheduler configuration in `scheduler-config.yaml`.
+
+```yaml
+# default scheduler
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+- schedulerName: default-scheduler
+```
+Creating own schedulers:
+
+```yaml
+# custom scheduler 1
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+- schedulerName: my-scheduler
+```
+```yaml
+# custom scheduler 2
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+- schedulerName: my-scheduler-2
+```
+#### Deploying Additional Scheduler:
+
+- We'll download the binary from the cloud repo.
+- Run, the `kube-scheduler.service` and provide the binary PATH and the config PATH.
+
+```bash
+# kube-scheduler.service
+ExecStart=/usr/local/bin/kube-scheduler \\
+--config=/etc/kubernetes/config/kube-scheduler.yaml
+```
+For custom schedulers, we can change the config file:
+```bash
+# kube-scheduler.service
+ExecStart=/usr/local/bin/kube-scheduler \\
+--config=/etc/kubernetes/config/my-scheduler-2-config.yaml
+```
+#### Deploy Additional Scheduler as a POD
+
 
 
 
