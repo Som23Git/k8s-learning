@@ -2391,9 +2391,9 @@ volumeStatsAggPeriod: 0s
 ```
 
 :rotating_light: 
-> [!Important - Note 1] The moment you create an place a pod yaml in the above `staticPodPath` i.e. `/etc/kubernetes/manifests`, the pod will be created by the `kubelet` automatically and you don't have to run it manually.
+>[!IMPORTANT] - Note 1 - The moment you create an place a pod yaml in the above `staticPodPath` i.e. `/etc/kubernetes/manifests`, the pod will be created by the `kubelet` automatically and you don't have to run it manually.
 
-> [!Important - Note 2] Please note, the `kubelet` are deployed as a `daemonsets` in each nodes, let it be `controlplane` or `node01` or `N Node...`. So, basically, each `kubelet` can have its own `staticPodPath` and it will NOT be the same for each nodes. So, makesure, you `ssh` each node and understand where the `kubelet- staticPodPath` is pointing to and then, delete or create static pods in that directory.
+>[!IMPORTANT] - Note 2 - Please note, the `kubelet` are deployed as a `daemonsets` in each nodes, let it be `controlplane` or `node01` or `N Node...`. So, basically, each `kubelet` can have its own `staticPodPath` and it will NOT be the same for each nodes. So, makesure, you `ssh` each node and understand where the `kubelet- staticPodPath` is pointing to and then, delete or create static pods in that directory.
 
 #### How to quickly create a static Pod?
 
@@ -2465,18 +2465,89 @@ profiles:
 
 ```bash
 # kube-scheduler.service
-ExecStart=/usr/local/bin/kube-scheduler \\
+ExecStart=/usr/local/bin/kube-scheduler \\    
 --config=/etc/kubernetes/config/kube-scheduler.yaml
 ```
 For custom schedulers, we can change the config file:
 ```bash
 # kube-scheduler.service
-ExecStart=/usr/local/bin/kube-scheduler \\
+ExecStart=/usr/local/bin/kube-scheduler \\    <-----------> Make use of the downloaded binary and add the custom scheduler configuration path
 --config=/etc/kubernetes/config/my-scheduler-2-config.yaml
 ```
+
+>[!IMPORTANT] But, this is NOT how you deploy the `custom schedulers` because the `kubeadm` tool deploys `schedulers` as `POD` instead  of a `service`.
+
 #### Deploy Additional Scheduler as a POD
 
+```yaml
+# my-custom-scheduler.yaml
 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-custom-scheduler
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - kube-scheduler
+    - --address=127.0.0.1
+    - --kubeconfig=/etc/kubernetes/scheduler.conf
+    - --config=/etc/kubernetes/my-scheduler-config.yaml
+    image: k8s.gcr.io/kube-scheduler-amd64:v1.11.3
+    name: kube-scheduler
+```
 
+Whereas, in `my-scheduler-config.yaml`
+
+```yaml
+# my-scheduler-config.yaml
+
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+- schedulerName: my-scheduler
+leaderElection:                 <-------------> Used when we have multiple master nodes and HA cluster
+  leaderElect: true
+  resourceNamespace: kube-system
+  resourceName: lock-object-my-scheduler
+```
+
+[K8s Doc on Multiple Schedulers](https://kubernetes.io/docs/tasks/extend-kubernetes/configure-multiple-schedulers/)
+
+Once, we have created the `custom scheduler`, let's see how we can include it in the `Pod` definition yaml.
+
+```yaml
+# pod-definition.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+  - image: nginx
+    name: nginx
+  schedulerName: my-custom-scheduler
+```
+
+#### How to view Events that the right scheduler picked up the POD?
+
+* Option 1:
+
+```bash
+$ kubectl get events -o wide
+```
+
+This command will display all the `SOURCE`, `MESSAGE`, and `REASON` where, the pod is scheduled using the specific scheduler or NOT.
+
+* Option 2:
+
+```bash
+$ kubectl logs my-custom-scheduler --name-space=kube-system
+```
+
+This will give the logs whether the scheduler assigned the pod to the node without any problem.
+
+----
 
 
