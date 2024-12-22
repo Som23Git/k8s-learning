@@ -2391,9 +2391,9 @@ volumeStatsAggPeriod: 0s
 ```
 
 :rotating_light: 
-> [!Important - Note 1] The moment you create an place a pod yaml in the above `staticPodPath` i.e. `/etc/kubernetes/manifests`, the pod will be created by the `kubelet` automatically and you don't have to run it manually.
+>[!IMPORTANT] - Note 1 - The moment you create an place a pod yaml in the above `staticPodPath` i.e. `/etc/kubernetes/manifests`, the pod will be created by the `kubelet` automatically and you don't have to run it manually.
 
-> [!Important - Note 2] Please note, the `kubelet` are deployed as a `daemonsets` in each nodes, let it be `controlplane` or `node01` or `N Node...`. So, basically, each `kubelet` can have its own `staticPodPath` and it will NOT be the same for each nodes. So, makesure, you `ssh` each node and understand where the `kubelet- staticPodPath` is pointing to and then, delete or create static pods in that directory.
+>[!IMPORTANT] - Note 2 - Please note, the `kubelet` are deployed as a `daemonsets` in each nodes, let it be `controlplane` or `node01` or `N Node...`. So, basically, each `kubelet` can have its own `staticPodPath` and it will NOT be the same for each nodes. So, makesure, you `ssh` each node and understand where the `kubelet- staticPodPath` is pointing to and then, delete or create static pods in that directory.
 
 #### How to quickly create a static Pod?
 
@@ -2465,18 +2465,217 @@ profiles:
 
 ```bash
 # kube-scheduler.service
-ExecStart=/usr/local/bin/kube-scheduler \\
+ExecStart=/usr/local/bin/kube-scheduler \\    
 --config=/etc/kubernetes/config/kube-scheduler.yaml
 ```
 For custom schedulers, we can change the config file:
 ```bash
 # kube-scheduler.service
-ExecStart=/usr/local/bin/kube-scheduler \\
+ExecStart=/usr/local/bin/kube-scheduler \\    <-----------> Make use of the downloaded binary and add the custom scheduler configuration path
 --config=/etc/kubernetes/config/my-scheduler-2-config.yaml
 ```
+
+>[!IMPORTANT] But, this is NOT how you deploy the `custom schedulers` because the `kubeadm` tool deploys `schedulers` as `POD` instead  of a `service`.
+
 #### Deploy Additional Scheduler as a POD
 
+```yaml
+# my-custom-scheduler.yaml
 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-custom-scheduler
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - kube-scheduler
+    - --address=127.0.0.1
+    - --kubeconfig=/etc/kubernetes/scheduler.conf
+    - --config=/etc/kubernetes/my-scheduler-config.yaml
+    image: k8s.gcr.io/kube-scheduler-amd64:v1.11.3
+    name: kube-scheduler
+```
 
+Whereas, in `my-scheduler-config.yaml`
+
+```yaml
+# my-scheduler-config.yaml
+
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+- schedulerName: my-scheduler
+leaderElection:                 <-------------> Used when we have multiple master nodes and HA cluster
+  leaderElect: true
+  resourceNamespace: kube-system
+  resourceName: lock-object-my-scheduler
+```
+
+[K8s Doc on Multiple Schedulers](https://kubernetes.io/docs/tasks/extend-kubernetes/configure-multiple-schedulers/)
+
+Once, we have created the `custom scheduler`, let's see how we can include it in the `Pod` definition yaml.
+
+```yaml
+# pod-definition.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+  - image: nginx
+    name: nginx
+  schedulerName: my-custom-scheduler
+```
+
+#### How to view Events that the right scheduler picked up the POD?
+
+* Option 1:
+
+```bash
+$ kubectl get events -o wide
+```
+```bash
+# Output Response
+kubectl get events -o wide
+LAST SEEN   TYPE      REASON                    OBJECT              SUBOBJECT                SOURCE                                    MESSAGE                                                                                               FIRST SEEN   COUNT   NAME
+21m         Normal    Starting                  node/controlplane                            kubelet, controlplane                     Starting kubelet.                                                                                     21m          1       controlplane.1813668e874fc7e1
+21m         Warning   CgroupV1                  node/controlplane                            kubelet, controlplane                     Cgroup v1 support is in maintenance mode, please migrate to Cgroup v2.                                21m          1       controlplane.1813668e87679f58
+21m         Warning   InvalidDiskCapacity       node/controlplane                            kubelet, controlplane                     invalid capacity 0 on image filesystem                                                                21m          1       controlplane.1813668e87ad31be
+21m         Normal    NodeAllocatableEnforced   node/controlplane                            kubelet, controlplane                     Updated Node Allocatable limit across pods                                                            21m          1       controlplane.1813668e8fded882
+21m         Normal    NodeHasSufficientMemory   node/controlplane                            kubelet, controlplane                     Node controlplane status is now: NodeHasSufficientMemory                                              21m          1       controlplane.1813668e95fed669
+21m         Normal    NodeHasNoDiskPressure     node/controlplane                            kubelet, controlplane                     Node controlplane status is now: NodeHasNoDiskPressure                                                21m          1       controlplane.1813668e95ff05dc
+21m         Normal    NodeHasSufficientPID      node/controlplane                            kubelet, controlplane                     Node controlplane status is now: NodeHasSufficientPID                                                 21m          1       controlplane.1813668e95ff19ee
+21m         Normal    RegisteredNode            node/controlplane                            node-controller                           Node controlplane event: Registered Node controlplane in Controller                                   21m          1       controlplane.1813668fe11db724
+21m         Normal    Starting                  node/controlplane                            kube-proxy, kube-proxy-controlplane                                                                                                             21m          1       controlplane.181366904f93b052
+21m         Normal    NodeReady                 node/controlplane                            kubelet, controlplane                     Node controlplane status is now: NodeReady                                                            21m          1       controlplane.1813669079189b92
+24s         Normal    Scheduled                 pod/nginx                                    my-scheduler, my-scheduler-my-scheduler   Successfully assigned default/nginx to controlplane                                                   24s          1       nginx.181367bbbc8116e5
+23s         Normal    Pulling                   pod/nginx           spec.containers{nginx}   kubelet, controlplane                     Pulling image "nginx"                                                                                 23s          1       nginx.181367bbe355aff4
+20s         Normal    Pulled                    pod/nginx           spec.containers{nginx}   kubelet, controlplane                     Successfully pulled image "nginx" in 3.284s (3.284s including waiting). Image size: 72099501 bytes.   20s          1       nginx.181367bca716100c
+20s         Normal    Created                   pod/nginx           spec.containers{nginx}   kubelet, controlplane                     Created container nginx                                                                               20s          1       nginx.181367bca92013b3
+20s         Normal    Started                   pod/nginx           spec.containers{nginx}   kubelet, controlplane                     Started container nginx                                                                               20s          1       nginx.181367bcb7ba41cf
+```
+
+This command will display all the `SOURCE`, `MESSAGE`, and `REASON` where, the pod is scheduled using the specific scheduler or NOT.
+
+* Option 2:
+
+```bash
+$ kubectl logs my-custom-scheduler --name-space=kube-system
+OR
+$ kubectl logs my-custom-scheduler -n kube-system
+```
+
+This will give the logs whether the scheduler assigned the pod to the node without any problem.
+
+#### How to create `ConfigMaps`?
+
+```yaml
+# $ cat my-scheduler-config.yaml
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+  - schedulerName: my-scheduler
+leaderElection:
+  leaderElect: false
+```
+
+```yaml
+# $ cat my-scheduler-configmap.yaml 
+apiVersion: v1
+data:
+  my-scheduler-config.yaml: |
+    apiVersion: kubescheduler.config.k8s.io/v1
+    kind: KubeSchedulerConfiguration
+    profiles:
+      - schedulerName: my-scheduler
+    leaderElection:
+      leaderElect: false
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  name: my-scheduler-config
+  namespace: kube-system
+```
+
+To create the `configMaps`
+```bash
+$ kubectl create -f my-scheduler-configmap.yaml 
+configmap/my-scheduler-config created
+```
+OR
+
+```bash
+$ kubecl create configmap my-scheduler-config --from-file=/root/my-scheduler-configmap.yaml -n kube-system
+configmap/my-scheduler-config created
+```
+
+```bash
+$ kubectl get configmap -A
+NAMESPACE         NAME                                                   DATA   AGE
+default           kube-root-ca.crt                                       1      15m
+kube-flannel      kube-flannel-cfg                                       2      15m
+kube-flannel      kube-root-ca.crt                                       1      15m
+kube-node-lease   kube-root-ca.crt                                       1      15m
+kube-public       cluster-info                                           2      15m
+kube-public       kube-root-ca.crt                                       1      15m
+kube-system       coredns                                                1      15m
+kube-system       extension-apiserver-authentication                     6      15m
+kube-system       kube-apiserver-legacy-service-account-token-tracking   1      15m
+kube-system       kube-proxy                                             2      15m
+kube-system       kube-root-ca.crt                                       1      15m
+kube-system       kubeadm-config                                         1      15m
+kube-system       kubelet-config                                         1      15m
+kube-system       my-scheduler-config                                    1      4s
+```
+
+#### How to create a proper scheduler pod definition file?
+
+```yaml
+# $ cat my-scheduler.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: my-scheduler
+  name: my-scheduler
+  namespace: kube-system
+spec:
+  serviceAccountName: my-scheduler
+  containers:
+  - command:
+    - /usr/local/bin/kube-scheduler
+    - --config=/etc/kubernetes/my-scheduler/my-scheduler-config.yaml
+    image: <use-correct-image>
+    livenessProbe:
+      httpGet:
+        path: /healthz
+        port: 10259
+        scheme: HTTPS
+      initialDelaySeconds: 15
+    name: kube-second-scheduler
+    readinessProbe:
+      httpGet:
+        path: /healthz
+        port: 10259
+        scheme: HTTPS
+    resources:
+      requests:
+        cpu: '0.1'
+    securityContext:
+      privileged: false
+    volumeMounts:
+      - name: config-volume
+        mountPath: /etc/kubernetes/my-scheduler
+  hostNetwork: false
+  hostPID: false
+  volumes:
+    - name: config-volume
+      configMap:
+        name: my-scheduler-config
+```
+----
 
 
