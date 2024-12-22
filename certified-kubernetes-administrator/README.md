@@ -2537,6 +2537,26 @@ spec:
 ```bash
 $ kubectl get events -o wide
 ```
+```bash
+# Output Response
+kubectl get events -o wide
+LAST SEEN   TYPE      REASON                    OBJECT              SUBOBJECT                SOURCE                                    MESSAGE                                                                                               FIRST SEEN   COUNT   NAME
+21m         Normal    Starting                  node/controlplane                            kubelet, controlplane                     Starting kubelet.                                                                                     21m          1       controlplane.1813668e874fc7e1
+21m         Warning   CgroupV1                  node/controlplane                            kubelet, controlplane                     Cgroup v1 support is in maintenance mode, please migrate to Cgroup v2.                                21m          1       controlplane.1813668e87679f58
+21m         Warning   InvalidDiskCapacity       node/controlplane                            kubelet, controlplane                     invalid capacity 0 on image filesystem                                                                21m          1       controlplane.1813668e87ad31be
+21m         Normal    NodeAllocatableEnforced   node/controlplane                            kubelet, controlplane                     Updated Node Allocatable limit across pods                                                            21m          1       controlplane.1813668e8fded882
+21m         Normal    NodeHasSufficientMemory   node/controlplane                            kubelet, controlplane                     Node controlplane status is now: NodeHasSufficientMemory                                              21m          1       controlplane.1813668e95fed669
+21m         Normal    NodeHasNoDiskPressure     node/controlplane                            kubelet, controlplane                     Node controlplane status is now: NodeHasNoDiskPressure                                                21m          1       controlplane.1813668e95ff05dc
+21m         Normal    NodeHasSufficientPID      node/controlplane                            kubelet, controlplane                     Node controlplane status is now: NodeHasSufficientPID                                                 21m          1       controlplane.1813668e95ff19ee
+21m         Normal    RegisteredNode            node/controlplane                            node-controller                           Node controlplane event: Registered Node controlplane in Controller                                   21m          1       controlplane.1813668fe11db724
+21m         Normal    Starting                  node/controlplane                            kube-proxy, kube-proxy-controlplane                                                                                                             21m          1       controlplane.181366904f93b052
+21m         Normal    NodeReady                 node/controlplane                            kubelet, controlplane                     Node controlplane status is now: NodeReady                                                            21m          1       controlplane.1813669079189b92
+24s         Normal    Scheduled                 pod/nginx                                    my-scheduler, my-scheduler-my-scheduler   Successfully assigned default/nginx to controlplane                                                   24s          1       nginx.181367bbbc8116e5
+23s         Normal    Pulling                   pod/nginx           spec.containers{nginx}   kubelet, controlplane                     Pulling image "nginx"                                                                                 23s          1       nginx.181367bbe355aff4
+20s         Normal    Pulled                    pod/nginx           spec.containers{nginx}   kubelet, controlplane                     Successfully pulled image "nginx" in 3.284s (3.284s including waiting). Image size: 72099501 bytes.   20s          1       nginx.181367bca716100c
+20s         Normal    Created                   pod/nginx           spec.containers{nginx}   kubelet, controlplane                     Created container nginx                                                                               20s          1       nginx.181367bca92013b3
+20s         Normal    Started                   pod/nginx           spec.containers{nginx}   kubelet, controlplane                     Started container nginx                                                                               20s          1       nginx.181367bcb7ba41cf
+```
 
 This command will display all the `SOURCE`, `MESSAGE`, and `REASON` where, the pod is scheduled using the specific scheduler or NOT.
 
@@ -2544,10 +2564,118 @@ This command will display all the `SOURCE`, `MESSAGE`, and `REASON` where, the p
 
 ```bash
 $ kubectl logs my-custom-scheduler --name-space=kube-system
+OR
+$ kubectl logs my-custom-scheduler -n kube-system
 ```
 
 This will give the logs whether the scheduler assigned the pod to the node without any problem.
 
+#### How to create `ConfigMaps`?
+
+```yaml
+# $ cat my-scheduler-config.yaml
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+  - schedulerName: my-scheduler
+leaderElection:
+  leaderElect: false
+```
+
+```yaml
+# $ cat my-scheduler-configmap.yaml 
+apiVersion: v1
+data:
+  my-scheduler-config.yaml: |
+    apiVersion: kubescheduler.config.k8s.io/v1
+    kind: KubeSchedulerConfiguration
+    profiles:
+      - schedulerName: my-scheduler
+    leaderElection:
+      leaderElect: false
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  name: my-scheduler-config
+  namespace: kube-system
+```
+
+To create the `configMaps`
+```bash
+$ kubectl create -f my-scheduler-configmap.yaml 
+configmap/my-scheduler-config created
+```
+OR
+
+```bash
+$ kubecl create configmap my-scheduler-config --from-file=/root/my-scheduler-configmap.yaml -n kube-system
+configmap/my-scheduler-config created
+```
+
+```bash
+$ kubectl get configmap -A
+NAMESPACE         NAME                                                   DATA   AGE
+default           kube-root-ca.crt                                       1      15m
+kube-flannel      kube-flannel-cfg                                       2      15m
+kube-flannel      kube-root-ca.crt                                       1      15m
+kube-node-lease   kube-root-ca.crt                                       1      15m
+kube-public       cluster-info                                           2      15m
+kube-public       kube-root-ca.crt                                       1      15m
+kube-system       coredns                                                1      15m
+kube-system       extension-apiserver-authentication                     6      15m
+kube-system       kube-apiserver-legacy-service-account-token-tracking   1      15m
+kube-system       kube-proxy                                             2      15m
+kube-system       kube-root-ca.crt                                       1      15m
+kube-system       kubeadm-config                                         1      15m
+kube-system       kubelet-config                                         1      15m
+kube-system       my-scheduler-config                                    1      4s
+```
+
+#### How to create a proper scheduler pod definition file?
+
+```yaml
+# $ cat my-scheduler.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: my-scheduler
+  name: my-scheduler
+  namespace: kube-system
+spec:
+  serviceAccountName: my-scheduler
+  containers:
+  - command:
+    - /usr/local/bin/kube-scheduler
+    - --config=/etc/kubernetes/my-scheduler/my-scheduler-config.yaml
+    image: <use-correct-image>
+    livenessProbe:
+      httpGet:
+        path: /healthz
+        port: 10259
+        scheme: HTTPS
+      initialDelaySeconds: 15
+    name: kube-second-scheduler
+    readinessProbe:
+      httpGet:
+        path: /healthz
+        port: 10259
+        scheme: HTTPS
+    resources:
+      requests:
+        cpu: '0.1'
+    securityContext:
+      privileged: false
+    volumeMounts:
+      - name: config-volume
+        mountPath: /etc/kubernetes/my-scheduler
+  hostNetwork: false
+  hostPID: false
+  volumes:
+    - name: config-volume
+      configMap:
+        name: my-scheduler-config
+```
 ----
 
 
