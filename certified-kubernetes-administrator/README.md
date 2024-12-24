@@ -2773,5 +2773,58 @@ This functionality is made available post `K8s v1.18`. Here is the [official K8s
 
 - https://stackoverflow.com/questions/28857993/how-does-kubernetes-scheduler-work
 
------
+----------
 
+## :: LOGGING AND MONITORING 
+
+----------
+
+### Monitoring Cluster Components
+
+#### How to do monitoring the resource consumption in K8s cluster? in specific, what would you like to monitor? Node level metrics, such as number_of_nodes, and how many of them in the cluster, memory, disk. And, pod level metrics!
+
+However, for now, the K8s does not come up with built-in monitoring solution.
+
+HEAPSTER - One of the initial projects that was built as an monitoring solution. But, now it is deprecated.
+
+As an successor solution of the Heapster, the `Metrics Server` was created. Here, the `Metrics Server` collects the monitoring metrics from the nodes & pods, and aggregates & stores in the `In-Memory` datastore and cannot view the Historical metrics but, can view the current metrics of the pods or nodes.
+
+To monitor and check the Historical Performance metrics, then you would need to make use of solutions like `Elastic Stack`, `Dynatrace`, `Datadog`, `Prometheus` and so on.
+
+#### So, let's understand how are the metrics generated on the pods in a K8s cluster?
+
+As we know, there is a `Kubelet` deployed as `agent` in each nodes, which talks with the `kube-apiserver` and collects the `pod metrics` using a sub-component within the `kubelet` called as `cAdvisor` i.e. `container Advisor` that collects the pod metrics and exposes the metrics via, kubelet > kube-apiserver > Metrics Server.
+
+#### How to deploy Metrics Server in an existing K8s cluster?
+
+In Minikube:
+
+```bash
+$ minikube addons enable metrics-server
+```
+
+And, while using `kubeadm` or other `K8s solutions`:
+
+Previously used:
+```bash
+$ git clone https://github.com/kubernetes-incubator/metrics-server.git
+```
+
+Latest Metrics Server repo: https://github.com/kubernetes-sigs/metrics-server
+
+```bash
+$ git clone https://github.com/kubernetes-sigs/metrics-server.git
+```
+
+And, run:
+
+```bash
+$ kubectl create -f deploy/1.8+/
+```
+
+Once, it deploys all the relevant objects/pods/services/ to run the `Metric Server`, you can make use of the below commands to check the metrics:
+
+```bash
+$ kubectl top node    # gives metrics of all the nodes in the K8s cluster
+$ kubectl top pods    # gives metrics of all the pods in the K8s cluster
+```
