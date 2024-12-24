@@ -2676,8 +2676,90 @@ spec:
       configMap:
         name: my-scheduler-config
 ```
+
+#### What are its Limitations of having Multiple Schedulers?
+
+- First and foremost, maintaining multiple schedulers at the same time is very challenging and as it runs as a service, it is difficult for schedulers to know whether the other schedulers are scheduling any pods/workloads to the same node at the same time. This creates a conflict, that's when we need something called as `Scheduler Profiles` to manage it automatically and each schedulers knows what are the neighboring schedulers.
 ----
 
 ### Scheduler Profiles
 
+To understand what is Scheduler Profiles, we need to understand how Scheduling works, the process from the scheduling, choosing the best node via Scoring mechanism, and binding it to a specific node.
+
+The different phases that the pod goes through before it runs within a node:
+
+- Scheduling Queue
+- Filtering phase
+- Scoring phase
+- Binding phase
+
+
+In among the phases, there are different scheduling plugins:
+
+#### Scheduling Queue:
+- PrioritySort - It is reponsible for queueing/moving the pods in the queue that got high priority, compared to the lower priority. So, the high priority pod is executed first.
+
+#### Filtering phase:
+
+- NodeResourcesFit - It is responsible for identifying the nodes that got sufficient resources to `fit the pods`, and filters out those nodes that does not fit the pods.
+- NodeName - It is responsible in identifying whether the pod-definition file is provided with `nodeName` parameter and if yes, it filters out other nodes and will align the pod with the node that is mentioned in the pod-definition file.
+- NodeUnschedulable - It is responsible to not schedule the pods when the nodes have set the flag `Unschedulable` to `true` i.e. it instructs the scheduler to do NOT schedule the pods in this node where the flag is enabled.
+
+#### Scoring:
+
+- NodeResourcesFit - In this phase, it is responsible to identify the node that has less resources and more resources when the pod is scheduled. It runs a prediction algorithm, assuming that if the pod is scheduled the nodes, then how much resources are remaining. The node that got the highest resource post scheduling the pods, will be considered as a `fit`.
+- ImageLocality - Associates a `high score` to the nodes that has already a copy of the `image` and make the pod to get assigned to the node even though, the other node has higher resources when compared.
+
+#### Binding:
+
+- DefaultBinder - It is responsible to bind the pod to the nodes that got scored in the previous phases to a specific node.
+
+>[!Important]
+> K8s cluster is highly extensible so, you can write your `own plugins` and add them in these phases using the `EXTENSION` points.
+> At each phase, you can attach the `plugin` to an `extension point`.
+> For example, the `PrioritySort` plugin from the `Scheduling Queue` phase, can be attached to the `queueSort` extension point. Other extensions are, `preFilter`, `Filter`,`PostFilter`, `PreScore`, `Score`, `Reserve`, `Permit`, `PreBind`, `Bind`, `PostBind` and more.
+
+To gain detailed understanding of `What plugins gets attached to different Extension Points`, refer to this [K8s Official Documentation on Scheduling Plugins](https://kubernetes.io/docs/reference/scheduling/config/#scheduling-plugins)
+
+The extension points can expand across multiple plugins.
+
+#### Let's understand how to modify the default behavior of the plugins are scheduled and how to add our own plugins
+
+Instead of running each schedulers separately, we can add all the schedulers under the same profile so that they know the status of each schedulers while assigning or allocating the pods/workloads to a specific node.
+
+```yml
+# my-scheduler-2-config.yaml
+apiVersion: kubescheduler.config.k8s.io/vl
+kind: KubeSchedulerConfiguration 
+profiles:
+- schedulerName: my-scheduler-2
+- schedulerName: my-scheduler-3
+- schedulerName: my-scheduler-4
+```
+To specify, the schedulers what to do, we can add the configuration below the schedulers itself:
+```yaml
+# my-scheduler-2-config.yaml
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration 
+profiles:
+- schedulerName: my-scheduler-2 
+plugins:                          <-----------------> Instructing the plugins to disable and enable to use the custom plugins.
+  score:
+    disabled:
+      - name: TaintToleration 
+    enabled:
+      - name: MyCustomPluginA
+      - name: MyCustomPluginB
+- schedulerName: my-scheduler-3
+  plugins:                        <-----------------> Removing/disabling all the plugins through the extension points here.
+    preScore: 
+      disabled:
+        - name: '*' 
+    score:
+      disabled:
+        - name: '*'
+- schedulerName: my-scheduler-4
+```
+
+This functionality is made available post `K8s v1.18`. Here is the [official K8s release notes](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.18.md#:~:text=Scheduling%20and%20Testing%5D-,Kube%2Dscheduler%20can%20run%20more%20than%20one%20scheduling%20profile.%20Given%20a%20pod%2C%20the%20profile%20is%20selected%20by%20using%20its%20.spec.schedulerName.%20(%2388285%2C%20%40alculquicondor)%20%5BSIG%20Apps%2C%20Scheduling%20and%20Testing%5D,-Scheduler%20Extenders%20can)
 
