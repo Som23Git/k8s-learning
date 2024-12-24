@@ -2821,10 +2821,285 @@ And, run:
 ```bash
 $ kubectl create -f deploy/1.8+/
 ```
-
-Once, it deploys all the relevant objects/pods/services/ to run the `Metric Server`, you can make use of the below commands to check the metrics:
+or, you can directly pull the `components.yaml` from the `Metrics Server` repo and apply it:
 
 ```bash
-$ kubectl top node    # gives metrics of all the nodes in the K8s cluster
-$ kubectl top pods    # gives metrics of all the pods in the K8s cluster
+$ kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+```
+```yaml
+# components.yaml
+
+$ cat components.yaml 
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: metrics-server
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    k8s-app: metrics-server
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+  name: system:aggregated-metrics-reader
+rules:
+- apiGroups:
+  - metrics.k8s.io
+  resources:
+  - pods
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: system:metrics-server
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes/metrics
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: metrics-server-auth-reader
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+- kind: ServiceAccount
+  name: metrics-server
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: metrics-server:system:auth-delegator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+- kind: ServiceAccount
+  name: metrics-server
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: system:metrics-server
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:metrics-server
+subjects:
+- kind: ServiceAccount
+  name: metrics-server
+  namespace: kube-system
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: metrics-server
+  namespace: kube-system
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: https
+  selector:
+    k8s-app: metrics-server
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: metrics-server
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      k8s-app: metrics-server
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        k8s-app: metrics-server
+    spec:
+      containers:
+      - args:
+        - --cert-dir=/tmp
+        - --secure-port=10250
+        - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+        - --kubelet-use-node-status-port
+        - --metric-resolution=15s
+        image: registry.k8s.io/metrics-server/metrics-server:v0.7.2
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /livez
+            port: https
+            scheme: HTTPS
+          periodSeconds: 10
+        name: metrics-server
+        ports:
+        - containerPort: 10250
+          name: https
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /readyz
+            port: https
+            scheme: HTTPS
+          initialDelaySeconds: 20
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - mountPath: /tmp
+          name: tmp-dir
+      nodeSelector:
+        kubernetes.io/os: linux
+      priorityClassName: system-cluster-critical
+      serviceAccountName: metrics-server
+      volumes:
+      - emptyDir: {}
+        name: tmp-dir
+---
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: v1beta1.metrics.k8s.io
+spec:
+  group: metrics.k8s.io
+  groupPriorityMinimum: 100
+  insecureSkipTLSVerify: true
+  service:
+    name: metrics-server
+    namespace: kube-system
+  version: v1beta1
+  versionPriority: 100
+```
+
+Once, it deploys all the relevant objects/pods/services/ to run the `Metric Server`:
+```bash
+#command:
+$ kubectl apply -f components.yaml 
+
+#output:
+serviceaccount/metrics-server created
+clusterrole.rbac.authorization.k8s.io/system:aggregated-metrics-reader created
+clusterrole.rbac.authorization.k8s.io/system:metrics-server created
+rolebinding.rbac.authorization.k8s.io/metrics-server-auth-reader created
+clusterrolebinding.rbac.authorization.k8s.io/metrics-server:system:auth-delegator created
+clusterrolebinding.rbac.authorization.k8s.io/system:metrics-server created
+service/metrics-server created
+deployment.apps/metrics-server created
+apiservice.apiregistration.k8s.io/v1beta1.metrics.k8s.io created
+```
+
+Can cross-verify with:
+```bash
+$ kubectl get all -A
+NAMESPACE      NAME                                       READY   STATUS    RESTARTS   AGE
+default        pod/elephant                               1/1     Running   0          9m1s
+default        pod/lion                                   1/1     Running   0          9m1s
+default        pod/rabbit                                 1/1     Running   0          9m1s
+kube-flannel   pod/kube-flannel-ds-2zpnc                  1/1     Running   0          18m
+kube-flannel   pod/kube-flannel-ds-692pz                  1/1     Running   0          18m
+kube-system    pod/coredns-77d6fd4654-8xqt4               1/1     Running   0          18m
+kube-system    pod/coredns-77d6fd4654-k525p               1/1     Running   0          18m
+kube-system    pod/etcd-controlplane                      1/1     Running   0          18m
+kube-system    pod/kube-apiserver-controlplane            1/1     Running   0          18m
+kube-system    pod/kube-controller-manager-controlplane   1/1     Running   0          18m
+kube-system    pod/kube-proxy-msg6g                       1/1     Running   0          18m
+kube-system    pod/kube-proxy-pl7ww                       1/1     Running   0          18m
+kube-system    pod/kube-scheduler-controlplane            1/1     Running   0          18m
+kube-system    pod/metrics-server-54bf7cdd6-k7vfj         1/1     Running   0          3m40s    ------ Metrics Server Pod
+
+NAMESPACE     NAME                     TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)                  AGE
+default       service/kubernetes       ClusterIP   172.20.0.1      <none>        443/TCP                  18m
+kube-system   service/kube-dns         ClusterIP   172.20.0.10     <none>        53/UDP,53/TCP,9153/TCP   18m
+kube-system   service/metrics-server   ClusterIP   172.20.73.248   <none>        443/TCP                  3m40s
+
+NAMESPACE      NAME                             DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE
+kube-flannel   daemonset.apps/kube-flannel-ds   2         2         2       2            2           <none>                   18m
+kube-system    daemonset.apps/kube-proxy        2         2         2       2            2           kubernetes.io/os=linux   18m
+
+NAMESPACE     NAME                             READY   UP-TO-DATE   AVAILABLE   AGE
+kube-system   deployment.apps/coredns          2/2     2            2           18m
+kube-system   deployment.apps/metrics-server   1/1     1            1           3m40s
+
+NAMESPACE     NAME                                       DESIRED   CURRENT   READY   AGE
+kube-system   replicaset.apps/coredns-77d6fd4654         2         2         2       18m
+kube-system   replicaset.apps/metrics-server-54bf7cdd6   1         1         1       3m40s
+```
+
+You can make use of the below commands to check the metrics:
+
+```bash
+$ kubectl top node          # gives metrics of all the nodes in the K8s cluster
+
+NAME           CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%   
+controlplane   195m         1%     875Mi           1%        
+node01         32m          0%     151Mi           0% 
+
+$ kubectl top pod    # gives metrics of all the pods in the K8s cluster
+
+NAME       CPU(cores)   MEMORY(bytes)   
+elephant   13m          30Mi            
+lion       1m           16Mi            
+rabbit     103m         250Mi  
 ```
