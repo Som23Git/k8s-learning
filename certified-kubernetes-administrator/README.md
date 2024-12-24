@@ -2676,8 +2676,430 @@ spec:
       configMap:
         name: my-scheduler-config
 ```
+
+#### What are its Limitations of having Multiple Schedulers?
+
+- First and foremost, maintaining multiple schedulers at the same time is very challenging and as it runs as a service, it is difficult for schedulers to know whether the other schedulers are scheduling any pods/workloads to the same node at the same time. This creates a conflict, that's when we need something called as `Scheduler Profiles` to manage it automatically and each schedulers knows what are the neighboring schedulers.
 ----
 
 ### Scheduler Profiles
 
+To understand what is Scheduler Profiles, we need to understand how Scheduling works, the process from the scheduling, choosing the best node via Scoring mechanism, and binding it to a specific node.
 
+The different phases that the pod goes through before it runs within a node:
+
+- Scheduling Queue
+- Filtering phase
+- Scoring phase
+- Binding phase
+
+
+In among the phases, there are different scheduling plugins:
+
+#### Scheduling Queue:
+- PrioritySort - It is reponsible for queueing/moving the pods in the queue that got high priority, compared to the lower priority. So, the high priority pod is executed first.
+
+#### Filtering phase:
+
+- NodeResourcesFit - It is responsible for identifying the nodes that got sufficient resources to `fit the pods`, and filters out those nodes that does not fit the pods.
+- NodeName - It is responsible in identifying whether the pod-definition file is provided with `nodeName` parameter and if yes, it filters out other nodes and will align the pod with the node that is mentioned in the pod-definition file.
+- NodeUnschedulable - It is responsible to not schedule the pods when the nodes have set the flag `Unschedulable` to `true` i.e. it instructs the scheduler to do NOT schedule the pods in this node where the flag is enabled.
+
+#### Scoring:
+
+- NodeResourcesFit - In this phase, it is responsible to identify the node that has less resources and more resources when the pod is scheduled. It runs a prediction algorithm, assuming that if the pod is scheduled the nodes, then how much resources are remaining. The node that got the highest resource post scheduling the pods, will be considered as a `fit`.
+- ImageLocality - Associates a `high score` to the nodes that has already a copy of the `image` and make the pod to get assigned to the node even though, the other node has higher resources when compared.
+
+#### Binding:
+
+- DefaultBinder - It is responsible to bind the pod to the nodes that got scored in the previous phases to a specific node.
+
+>[!Important]
+> K8s cluster is highly extensible so, you can write your `own plugins` and add them in these phases using the `EXTENSION` points.
+> At each phase, you can attach the `plugin` to an `extension point`.
+> For example, the `PrioritySort` plugin from the `Scheduling Queue` phase, can be attached to the `queueSort` extension point. Other extensions are, `preFilter`, `Filter`,`PostFilter`, `PreScore`, `Score`, `Reserve`, `Permit`, `PreBind`, `Bind`, `PostBind` and more.
+
+To gain detailed understanding of `What plugins gets attached to different Extension Points`, refer to this [K8s Official Documentation on Scheduling Plugins](https://kubernetes.io/docs/reference/scheduling/config/#scheduling-plugins)
+
+The extension points can expand across multiple plugins.
+
+#### Let's understand how to modify the default behavior of the plugins are scheduled and how to add our own plugins
+
+Instead of running each schedulers separately, we can add all the schedulers under the same profile so that they know the status of each schedulers while assigning or allocating the pods/workloads to a specific node.
+
+```yml
+# my-scheduler-2-config.yaml
+apiVersion: kubescheduler.config.k8s.io/vl
+kind: KubeSchedulerConfiguration 
+profiles:
+- schedulerName: my-scheduler-2
+- schedulerName: my-scheduler-3
+- schedulerName: my-scheduler-4
+```
+To specify, the schedulers what to do, we can add the configuration below the schedulers itself:
+```yaml
+# my-scheduler-2-config.yaml
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration 
+profiles:
+- schedulerName: my-scheduler-2 
+plugins:                          <-----------------> Instructing the plugins to disable and enable to use the custom plugins.
+  score:
+    disabled:
+      - name: TaintToleration 
+    enabled:
+      - name: MyCustomPluginA
+      - name: MyCustomPluginB
+- schedulerName: my-scheduler-3
+  plugins:                        <-----------------> Removing/disabling all the plugins through the extension points here.
+    preScore: 
+      disabled:
+        - name: '*' 
+    score:
+      disabled:
+        - name: '*'
+- schedulerName: my-scheduler-4
+```
+
+This functionality is made available post `K8s v1.18`. Here is the [official K8s release notes](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.18.md#:~:text=Scheduling%20and%20Testing%5D-,Kube%2Dscheduler%20can%20run%20more%20than%20one%20scheduling%20profile.%20Given%20a%20pod%2C%20the%20profile%20is%20selected%20by%20using%20its%20.spec.schedulerName.%20(%2388285%2C%20%40alculquicondor)%20%5BSIG%20Apps%2C%20Scheduling%20and%20Testing%5D,-Scheduler%20Extenders%20can)
+
+#### Very Important Resources for reference regarding the Schedulers and how it works:
+
+- https://github.com/kubernetes/community/blob/master/contributors/devel/sig-scheduling/scheduling_code_hierarchy_overview.md
+
+- https://kubernetes.io/blog/2017/03/advanced-scheduling-in-kubernetes/
+
+- https://jvns.ca/blog/2017/07/27/how-does-the-kubernetes-scheduler-work/
+
+- https://stackoverflow.com/questions/28857993/how-does-kubernetes-scheduler-work
+
+----------
+
+## :: LOGGING AND MONITORING 
+
+----------
+
+### Monitoring Cluster Components
+
+#### How to do monitoring the resource consumption in K8s cluster? in specific, what would you like to monitor? Node level metrics, such as number_of_nodes, and how many of them in the cluster, memory, disk. And, pod level metrics!
+
+However, for now, the K8s does not come up with built-in monitoring solution.
+
+HEAPSTER - One of the initial projects that was built as an monitoring solution. But, now it is deprecated.
+
+As an successor solution of the Heapster, the `Metrics Server` was created. Here, the `Metrics Server` collects the monitoring metrics from the nodes & pods, and aggregates & stores in the `In-Memory` datastore and cannot view the Historical metrics but, can view the current metrics of the pods or nodes.
+
+To monitor and check the Historical Performance metrics, then you would need to make use of solutions like `Elastic Stack`, `Dynatrace`, `Datadog`, `Prometheus` and so on.
+
+#### So, let's understand how are the metrics generated on the pods in a K8s cluster?
+
+As we know, there is a `Kubelet` deployed as `agent` in each nodes, which talks with the `kube-apiserver` and collects the `pod metrics` using a sub-component within the `kubelet` called as `cAdvisor` i.e. `container Advisor` that collects the pod metrics and exposes the metrics via, kubelet > kube-apiserver > Metrics Server.
+
+#### How to deploy Metrics Server in an existing K8s cluster?
+
+In Minikube:
+
+```bash
+$ minikube addons enable metrics-server
+```
+
+And, while using `kubeadm` or other `K8s solutions`:
+
+Previously used:
+```bash
+$ git clone https://github.com/kubernetes-incubator/metrics-server.git
+```
+
+Latest Metrics Server repo: https://github.com/kubernetes-sigs/metrics-server
+
+```bash
+$ git clone https://github.com/kubernetes-sigs/metrics-server.git
+```
+
+And, run:
+
+```bash
+$ kubectl create -f deploy/1.8+/
+```
+or, you can directly pull the `components.yaml` from the `Metrics Server` repo and apply it:
+
+```bash
+$ kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+```
+```yaml
+# components.yaml
+
+$ cat components.yaml 
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: metrics-server
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    k8s-app: metrics-server
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+  name: system:aggregated-metrics-reader
+rules:
+- apiGroups:
+  - metrics.k8s.io
+  resources:
+  - pods
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: system:metrics-server
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes/metrics
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: metrics-server-auth-reader
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+- kind: ServiceAccount
+  name: metrics-server
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: metrics-server:system:auth-delegator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+- kind: ServiceAccount
+  name: metrics-server
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: system:metrics-server
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:metrics-server
+subjects:
+- kind: ServiceAccount
+  name: metrics-server
+  namespace: kube-system
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: metrics-server
+  namespace: kube-system
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: https
+  selector:
+    k8s-app: metrics-server
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: metrics-server
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      k8s-app: metrics-server
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        k8s-app: metrics-server
+    spec:
+      containers:
+      - args:
+        - --cert-dir=/tmp
+        - --secure-port=10250
+        - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+        - --kubelet-use-node-status-port
+        - --metric-resolution=15s
+        image: registry.k8s.io/metrics-server/metrics-server:v0.7.2
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /livez
+            port: https
+            scheme: HTTPS
+          periodSeconds: 10
+        name: metrics-server
+        ports:
+        - containerPort: 10250
+          name: https
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /readyz
+            port: https
+            scheme: HTTPS
+          initialDelaySeconds: 20
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - mountPath: /tmp
+          name: tmp-dir
+      nodeSelector:
+        kubernetes.io/os: linux
+      priorityClassName: system-cluster-critical
+      serviceAccountName: metrics-server
+      volumes:
+      - emptyDir: {}
+        name: tmp-dir
+---
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: v1beta1.metrics.k8s.io
+spec:
+  group: metrics.k8s.io
+  groupPriorityMinimum: 100
+  insecureSkipTLSVerify: true
+  service:
+    name: metrics-server
+    namespace: kube-system
+  version: v1beta1
+  versionPriority: 100
+```
+
+Once, it deploys all the relevant objects/pods/services/ to run the `Metric Server`:
+```bash
+#command:
+$ kubectl apply -f components.yaml 
+
+#output:
+serviceaccount/metrics-server created
+clusterrole.rbac.authorization.k8s.io/system:aggregated-metrics-reader created
+clusterrole.rbac.authorization.k8s.io/system:metrics-server created
+rolebinding.rbac.authorization.k8s.io/metrics-server-auth-reader created
+clusterrolebinding.rbac.authorization.k8s.io/metrics-server:system:auth-delegator created
+clusterrolebinding.rbac.authorization.k8s.io/system:metrics-server created
+service/metrics-server created
+deployment.apps/metrics-server created
+apiservice.apiregistration.k8s.io/v1beta1.metrics.k8s.io created
+```
+
+Can cross-verify with:
+```bash
+$ kubectl get all -A
+NAMESPACE      NAME                                       READY   STATUS    RESTARTS   AGE
+default        pod/elephant                               1/1     Running   0          9m1s
+default        pod/lion                                   1/1     Running   0          9m1s
+default        pod/rabbit                                 1/1     Running   0          9m1s
+kube-flannel   pod/kube-flannel-ds-2zpnc                  1/1     Running   0          18m
+kube-flannel   pod/kube-flannel-ds-692pz                  1/1     Running   0          18m
+kube-system    pod/coredns-77d6fd4654-8xqt4               1/1     Running   0          18m
+kube-system    pod/coredns-77d6fd4654-k525p               1/1     Running   0          18m
+kube-system    pod/etcd-controlplane                      1/1     Running   0          18m
+kube-system    pod/kube-apiserver-controlplane            1/1     Running   0          18m
+kube-system    pod/kube-controller-manager-controlplane   1/1     Running   0          18m
+kube-system    pod/kube-proxy-msg6g                       1/1     Running   0          18m
+kube-system    pod/kube-proxy-pl7ww                       1/1     Running   0          18m
+kube-system    pod/kube-scheduler-controlplane            1/1     Running   0          18m
+kube-system    pod/metrics-server-54bf7cdd6-k7vfj         1/1     Running   0          3m40s    ------ Metrics Server Pod
+
+NAMESPACE     NAME                     TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)                  AGE
+default       service/kubernetes       ClusterIP   172.20.0.1      <none>        443/TCP                  18m
+kube-system   service/kube-dns         ClusterIP   172.20.0.10     <none>        53/UDP,53/TCP,9153/TCP   18m
+kube-system   service/metrics-server   ClusterIP   172.20.73.248   <none>        443/TCP                  3m40s
+
+NAMESPACE      NAME                             DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE
+kube-flannel   daemonset.apps/kube-flannel-ds   2         2         2       2            2           <none>                   18m
+kube-system    daemonset.apps/kube-proxy        2         2         2       2            2           kubernetes.io/os=linux   18m
+
+NAMESPACE     NAME                             READY   UP-TO-DATE   AVAILABLE   AGE
+kube-system   deployment.apps/coredns          2/2     2            2           18m
+kube-system   deployment.apps/metrics-server   1/1     1            1           3m40s
+
+NAMESPACE     NAME                                       DESIRED   CURRENT   READY   AGE
+kube-system   replicaset.apps/coredns-77d6fd4654         2         2         2       18m
+kube-system   replicaset.apps/metrics-server-54bf7cdd6   1         1         1       3m40s
+```
+
+You can make use of the below commands to check the metrics:
+
+```bash
+$ kubectl top node          # gives metrics of all the nodes in the K8s cluster
+
+NAME           CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%   
+controlplane   195m         1%     875Mi           1%        
+node01         32m          0%     151Mi           0% 
+
+$ kubectl top pod    # gives metrics of all the pods in the K8s cluster
+
+NAME       CPU(cores)   MEMORY(bytes)   
+elephant   13m          30Mi            
+lion       1m           16Mi            
+rabbit     103m         250Mi  
+```
