@@ -2763,3 +2763,15 @@ plugins:                          <-----------------> Instructing the plugins to
 
 This functionality is made available post `K8s v1.18`. Here is the [official K8s release notes](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.18.md#:~:text=Scheduling%20and%20Testing%5D-,Kube%2Dscheduler%20can%20run%20more%20than%20one%20scheduling%20profile.%20Given%20a%20pod%2C%20the%20profile%20is%20selected%20by%20using%20its%20.spec.schedulerName.%20(%2388285%2C%20%40alculquicondor)%20%5BSIG%20Apps%2C%20Scheduling%20and%20Testing%5D,-Scheduler%20Extenders%20can)
 
+#### Very Important Resources for reference regarding the Schedulers and how it works:
+
+- https://github.com/kubernetes/community/blob/master/contributors/devel/sig-scheduling/scheduling_code_hierarchy_overview.md
+
+- https://kubernetes.io/blog/2017/03/advanced-scheduling-in-kubernetes/
+
+- https://jvns.ca/blog/2017/07/27/how-does-the-kubernetes-scheduler-work/
+
+- https://stackoverflow.com/questions/28857993/how-does-kubernetes-scheduler-work
+
+-----
+
