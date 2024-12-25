@@ -3148,6 +3148,12 @@ $ kubectl logs -f <pod-name> <container-name>
 
 Please note, `-f` option will stream/tail the logs from that relevant containers.
 
+#### K8s Reference Documentation:
+
+- https://kubernetes.io/docs/tasks/debug-application-cluster/core-metrics-pipeline/
+- https://kubernetes.io/docs/tasks/debug-application-cluster/resource-usage-monitoring/
+- https://kubernetes.io/docs/tasks/administer-cluster/manage-resources/
+
 ----
 
 
