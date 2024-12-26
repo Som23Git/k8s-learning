@@ -3158,6 +3158,67 @@ Please note, `-f` option will stream/tail the logs from that relevant containers
 
 ### Application Lifecycle Management
 
+#### Rolling Updates and Rollbacks
+
+By default, it is a rolling update strategy:
+
+- Recreate - Every old pods are down and bring up a new set of pods, in this there is a downtime.
+- RollingUpdate - In this strategy, it will destroy one pod or several pods at a time, but NOT all the pods, making sure that the other pods are accessible and online to manage the ongoing traffic.
+
+
+```plaintext
+Configuring applications comprises understanding the following concepts:
+
+- Configuring Commands and Arguments on applications
+
+- Configuring Environment Variables
+
+- Configuring Secrets
+
+```
+
+#### Application Commands Arguments and Entry points in Containers + Docker + Pods
+
+Please note, the `Command` i.e. `CMD` option is used to inform the container to perform a specific task. For example:
+
+```docker.yaml
+CMD ["sleep 5"]
+```
+
+So, what happens is, once the container starts running, it will execute this CMD that we added.
+
+But, if you have an `ENTRYPOINT` option, then it is the first executable function so, anything else comes after this command is executed after its executed. For example:
+
+```docker.yaml
+ENTRYPOINT ["sleep"]
+
+CMD ["5"]
+```
+
+Let's take this command - `docker run Ubuntu <ENTRYPOINT> <CMD>` translates to `docker run Ubuntu sleep 10` so, basically, if you add something in `CMD`, then it automatically gets overrided but, however, the `ENTRYPOINT` does not and it runs as a first executable when the container is restarted or started every time.
+
+You can also override the `ENTRYPOINT` option by just adding the option in the command - `docker run --entrypoint /bin/sh Ubuntu 5`
+
+#### Commands ad Arguments in a K8s Pod
+
+Same as you see above in Docker, this works the same in Pods but, with a slight modification:
+
+Comparing with this command: `docker run Ubuntu sleep 10`
+```pod-definition.yaml
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: ubuntu
+spec:
+  containers:
+    - image: Ubuntu
+      name: ubuntu
+      command": ["sleep"]       
+      args: ["10"]
+```
+
+>[!Caution]
+> If you see, the `CMD` in the docker file, is `args` in the K8s pod definition file, whereas, the `ENTRYPOINT` in the docker file is the `command` in the K8s pod definition file, so be careful in understanding this change.
 
 
 
