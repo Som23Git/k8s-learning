@@ -3268,3 +3268,234 @@ spec:
       - "10"
 ```
 -------
+
+### Configure Environment Variables
+
+Taking the same docker for instance:
+
+```bash
+$ docker run -e APP_COLOR=pink simple-webapp-color
+```
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color
+spec:
+  containers:
+    - image: simple-webapp-color
+      name: simple-webapp-color
+      ports:
+      - containerPort: 8080
+      env:
+      - name: APP_COLOR
+        value: pink
+```
+
+Environment value can be added in three ways:
+
+* Plain Key Value
+- adding it as `value` itself directly in the pod-definition file.
+
+```yaml
+env:
+  - name: APP_COLOR
+    value: pink
+```
+* ConfigMaps
+- adding it as a `valueFrom` property and referencing it from the `configMap`.
+
+```yaml
+env:
+  - name: APP_COLOR
+    valueFrom:
+      configMapKeyRef:
+```
+
+* Secrets:
+- adding it  as a `valueFrom` property and referencing it from the `secrets`.
+
+```yaml
+env:
+  - name: APP_COLOR
+    valueFrom:
+      secretKeyRef:
+```
+
+#### How to work with Configuration Files or ConfigMaps
+
+It is form of key-value pairs and passed to the pods to make use of it.
+
+Two phases:
+
+Create configMap
+Inject the configMap into the pod
+
+Two ways to deploy the configMaps:
+
+:: Imperative way 
+
+```bash
+$ kubectl create configmap <config-name> --from-literal=<key>=<value>
+```
+
+```bash
+$ kubectl create configmap app-config --from-literal=APP_COLOR=blue
+```
+
+`--from-literal` is used to specify the `key-value` pair and you can use `--from-literal` multiple times, if you have multiple `key-value` pair.
+
+```bash
+$ kubectl create configmap app-config --from-literal=APP_COLOR=blue --from-literal=APP_MOD=prod
+```
+However, adding more `--from-literal` is not the right approach, instead we can pass the `filename` where the `key-value` pairs are stored.
+
+```bash
+$ kubectl create configmap app-config --from-file=app_config.properties
+```
+
+:: Declarative way:
+
+For this, we create using the `Definition` file:
+
+```yaml
+# config-map.yaml
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  APP_COLOR: blue
+  APP_MODE: prod
+```
+
+```yaml
+kubectl create -f config-map-definition.yaml
+```
+
+Example of the ConfigMaps:
+
+```yaml
+# app-config.yaml
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  APP_COLOR: blue
+  APP_MODE: prod
+```
+```yaml
+# mysql-config.yaml
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-config
+data:
+  port: 3306
+  max_allowed_packet: 128M
+```
+```yaml
+# redis-config.yaml
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+data:
+  port: 6379
+  rdb-compression: yes
+```
+
+To view the configMaps:
+
+```bash
+$ kubectl get configmaps
+```
+
+```bash
+$ kubectl describe configmaps
+```
+
+Now that we created a `configmaps`, let's inject the configMap to a corresponding pod:
+
+* Default method:
+
+```yaml
+# app-config.yaml
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  APP_COLOR: blue
+  APP_MODE: prod
+```
+
+```yaml
+# pod-definition.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color
+spec:
+  containers:
+    - image: simple-webapp-color
+      name: simple-webapp-color
+      ports:
+      - containerPort: 8080
+      envFrom:
+      - configMapRef:
+          name: app-config
+```
+
+Also, there are different ways to inject environmental variables to a POD:
+
+* Using `Single env`, where we are only passing the `value` through the configMap file but, the `key` is provided in the `pod-definition.yaml` itself:
+
+```yaml
+# pod-definition.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color
+spec:
+  containers:
+    - image: simple-webapp-color
+      name: simple-webapp-color
+      ports:
+      - containerPort: 8080
+      env:
+      - name: APP_COLOR
+        valueFrom:
+          configMapRef:
+            name: app-config
+            key: APP_COLOR
+```
+
+* You can make use of the `volume` to add the `Enviromental Variables` to a pod:
+
+```yaml
+# pod-definition.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color
+spec:
+  containers:
+    - image: simple-webapp-color
+      name: simple-webapp-color
+      ports:
+      - containerPort: 8080
+      volumes:
+      - name: app-config-volume
+        configMap:
+          name: app-config
+```
+
+
