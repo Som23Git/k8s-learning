@@ -3415,10 +3415,42 @@ To view the configMaps:
 
 ```bash
 $ kubectl get configmaps
-```
 
+# output response
+NAME                DATA   AGE
+db-config           3      7m16s
+kube-root-ca.crt    1      25m
+webapp-color        2      115s
+webapp-config-map   2      8s
+```
 ```bash
-$ kubectl describe configmaps
+$ kubectl describe configmaps db-config
+
+# output response
+Name:         db-config
+Namespace:    default
+Labels:       <none>
+Annotations:  <none>
+
+Data
+====
+DB_NAME:
+----
+SQL01
+
+DB_PORT:
+----
+3306
+
+DB_HOST:
+----
+SQL01.example.com
+
+
+BinaryData
+====
+
+Events:  <none>
 ```
 
 Now that we created a `configmaps`, let's inject the configMap to a corresponding pod:
@@ -3473,7 +3505,7 @@ spec:
       env:
       - name: APP_COLOR
         valueFrom:
-          configMapRef:
+          configMapKeyRef:      <---------> Please note, this is configMapKeyRef and NOT just configMapRef
             name: app-config
             key: APP_COLOR
 ```
