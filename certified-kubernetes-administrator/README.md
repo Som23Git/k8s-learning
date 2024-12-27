@@ -3597,11 +3597,11 @@ As `configMaps`, there are two steps involved in Secrets:
     apiVersion: v1
     kind: Secret
     metadata:
-    name: app-secret
+      name: app-secret
     data:
-    DB_Host: bXlzcWw=
-    DB_User: cm9vdA==
-    DB_Password: cGFzd3Jk
+      DB_Host: bXlzcWw=
+      DB_User: cm9vdA==
+      DB_Password: cGFzd3Jk
     ```
     
     You can make use of the below command to `decode`:   
@@ -3622,10 +3622,36 @@ As `configMaps`, there are two steps involved in Secrets:
 
     ```bash
     $ kubectl get secrets
+
+    # Example:
+    $ kubectl get secrets
+    
+    # Output:
+    NAME              TYPE                                  DATA   AGE
+    dashboard-token   kubernetes.io/service-account-token   3      2m1s
     ```
 
     ```bash
-    $ kubectl describe secrets
+    $ kubectl describe secrets <secrets-name>
+
+    # Example:
+    $ kubectl describe secrets dashboard-token
+
+    # Output:
+    Name:         dashboard-token
+    Namespace:    default
+    Labels:       <none>
+    Annotations:  kubernetes.io/service-account.name: dashboard-sa
+                  kubernetes.io/service-account.uid: 07edd938-81d1-4cf8-a988-c5c506464493
+
+    Type:  kubernetes.io/service-account-token
+
+    Data
+    ====
+    ca.crt:     566 bytes
+    namespace:  7 bytes
+    token:      ey.......hLg
+        
     ```
 
 **Step 2: Inject the Secret to the pod**
@@ -3762,5 +3788,6 @@ paswrd
 > * Also, `Secrets` are NOT `encrypted` in ETCD so consider enabling `Encrypting data in REST`.
 > * Anyone who creates pods and deployments in the same `namespace`, can access the `Secrets` as well. So, please make sure you have a RBAC(Role-based access control) to restrict the `secrets` from using the specific pods and NOT all.
 > * As an advanced method, you can make use of storing the `Secrets` in a `third-party secrets store providers` like AWS Provider, Azure Provider, GCP Provider.
+
 
 
