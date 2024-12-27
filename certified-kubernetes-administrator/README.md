@@ -3530,4 +3530,237 @@ spec:
           name: app-config
 ```
 
+#### The Limitations of the ConfigMap:
+
+- Even though, we have configMaps to store the environmental variables like, `username`, `userId`, some important variables, but it is NOT the best place to store the `passwords`. This is where, we need something called as `Secrets`. 
+----
+
+### K8s Secrets
+
+Secrets are the place/object where you store the (sensitive information) `passwords` or `keys` and they're similar as `configMaps`. The primary reason why we use the `Secrets` is because the variables are stored in a form of encoded form.
+
+As `configMaps`, there are two steps involved in Secrets:
+
+**Step 1: Create Secret**
+
+  * Imperative way - without using a `secret-definition-file.yaml`
+
+    ```bash 
+    # syntax
+    $ kubectl create secret generic <secret-name> --from-literal=<key>=<value>
+    ```
+
+    ```bash
+    $ kubectl create secret generic app-secret --from-literal=DB_Host=mysql --from-literal=DB_User=root --from-literal=DB_Password=paswrd
+    ```
+    ```bash
+    # syntax
+    $ kubectl create secret generic <secret-name> --from-file=<path-to-file>
+    ```
+
+    ```bash
+    $ kubectl create secret generic app-secret --from-file=app_secret.properties
+    ```
+
+  * Declarative way - with using a `secret-definition-file.yaml`
+
+    ```yaml
+    # secret-data.yaml
+
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: app-secret
+    data:
+      DB_Host: mysql
+      DB_User: root
+      DB_Password: paswrd
+    ```
+    Convert the `data` in an encoded form i.e. `base64`
+
+    So, you would need to manually `encode` and `decode` the `secret's data value`
+
+    You can make use of the below command to `encode`:
+
+    ```bash
+    echo -n "mysql" | base64
+    bXlzcWw=
+    echo -n "root" | base64
+    cm9vdA==
+    echo -n "paswrd" | base64
+    cGFzd3Jk
+    ```
+
+    ```yaml
+    # secret-data.yaml
+
+    apiVersion: v1
+    kind: Secret
+    metadata:
+    name: app-secret
+    data:
+    DB_Host: bXlzcWw=
+    DB_User: cm9vdA==
+    DB_Password: cGFzd3Jk
+    ```
+    
+    You can make use of the below command to `decode`:   
+
+    ```bash
+    echo -n "bXlzcWw=" | base64 --decode
+    mysql
+    echo -n "cm9vdA==" | base64 --decode
+    root
+    echo -n "cGFzd3Jk" | base64 --decode
+    paswrd
+    ```
+
+    ```bash
+    kubectl create -f secret-data.yaml
+    ```
+    To view the `Secrets`, run the below `GET` command:
+
+    ```bash
+    $ kubectl get secrets
+    ```
+
+    ```bash
+    $ kubectl describe secrets
+    ```
+
+**Step 2: Inject the Secret to the pod**
+
+```yaml
+# secret-data.yaml
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secret
+data:
+  DB_Host: mysql
+  DB_User: root
+  DB_Password: paswrd
+```
+
+```yaml
+# pod-definition.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color
+  labels:
+    name: simple-webapp-color
+spec:
+  containers:
+    - image: simple-webapp-color
+      name: simple-webapp-color
+      ports:
+        - containerPort: 8080
+      envFrom:
+        - secretRef:
+            name: app-secret
+```
+```bash
+$ kubectl create -f pod-definition.yaml
+```
+
+Different ways to inject secrets to Pod:
+
+- Default method:
+
+```yaml
+# pod-definition.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color
+  labels:
+    name: simple-webapp-color
+spec:
+  containers:
+    - image: simple-webapp-color
+      name: simple-webapp-color
+      ports:
+        - containerPort: 8080
+      envFrom:
+        - secretRef:
+            name: app-secret
+```
+
+- Calling just a `single Enviromental Variable`
+
+```yaml
+# pod-definition.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color
+  labels:
+    name: simple-webapp-color
+spec:
+  containers:
+    - image: simple-webapp-color
+      name: simple-webapp-color
+      ports:
+        - containerPort: 8080
+      env:
+        - name: DB_Password
+          valueFrom:
+            secretKeyRef:
+              name: app-secret
+              key: DB_Password
+```
+
+- Injecting the secrets via the `Volumes`
+
+```yaml
+# pod-definition.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color
+  labels:
+    name: simple-webapp-color
+spec:
+  containers:
+    - image: simple-webapp-color
+      name: simple-webapp-color
+      ports:
+        - containerPort: 8080
+      volumes:
+      - name: app-secret-volume
+        secret:
+          secretName: app-secret
+```
+
+Here, when using the `Secrets` as `Volumes`, each `key-value` is created as a `key` the file and the `value` as the data within the file.
+
+Once, you `ssh` within the `container`:
+
+```bash
+$ ls /opt/app-secret-volumes
+
+# output
+DB_Host   DB_Password   DB_User
+```
+
+```bash
+$ cat /opt/app-secret-volumes/DB_Password
+
+# output
+paswrd
+```
+
+>[!Important]
+> * Please note, the `Secrets` are NOT `encrypted`, just `encoded` so, keep it in mind because anyone can `decode` the secrets.
+> * Do not push it along with the SCM(Source Code Management) in Github
+> * Also, `Secrets` are NOT `encrypted` in ETCD so consider enabling `Encrypting data in REST`.
+> * Anyone who creates pods and deployments in the same `namespace`, can access the `Secrets` as well. So, please make sure you have a RBAC(Role-based access control) to restrict the `secrets` from using the specific pods and NOT all.
+> * As an advanced method, you can make use of storing the `Secrets` in a `third-party secrets store providers` like AWS Provider, Azure Provider, GCP Provider.
+
 
