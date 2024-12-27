@@ -3757,7 +3757,10 @@ paswrd
 ```
 
 >[!Important]
-> Please note, the `Secrets` are NOT `encrypted`, just `encoded` so, keep it mind.
-> Do not push it along with the SCM(Source Code Management) in Github
+> * Please note, the `Secrets` are NOT `encrypted`, just `encoded` so, keep it in mind because anyone can `decode` the secrets.
+> * Do not push it along with the SCM(Source Code Management) in Github
+> * Also, `Secrets` are NOT `encrypted` in ETCD so consider enabling `Encrypting data in REST`.
+> * Anyone who creates pods and deployments in the same `namespace`, can access the `Secrets` as well. So, please make sure you have a RBAC(Role-based access control) to restrict the `secrets` from using the specific pods and NOT all.
+> * As an advanced method, you can make use of storing the `Secrets` in a `third-party secrets store providers` like AWS Provider, Azure Provider, GCP Provider.
 
 
