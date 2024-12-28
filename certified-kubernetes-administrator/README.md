@@ -3788,6 +3788,25 @@ paswrd
 > * Also, `Secrets` are NOT `encrypted` in ETCD so consider enabling `Encrypting data in REST`.
 > * Anyone who creates pods and deployments in the same `namespace`, can access the `Secrets` as well. So, please make sure you have a RBAC(Role-based access control) to restrict the `secrets` from using the specific pods and NOT all.
 > * As an advanced method, you can make use of storing the `Secrets` in a `third-party secrets store providers` like AWS Provider, Azure Provider, GCP Provider.
+> * There are many secrets provider or tools to handle the `secrets` in a `k8s cluster`, tools like - `External Secrets Operator[ESO]`, `Sealed Secrets`, and `Secret Store CSI Driver`.
+
+
+#### Let's check what, why, and How to use the  `Secret Store CSI Driver` and to manage within the `K8s cluster`
+
+##### Why was this created? What problems does this tool address?
+
+:white_check_mark: Basically, the `Secrets Store CSI Driver` synchronizes secrets from external APIs(like AWS Secrets Manager) and mounts them into pods i.e. containers as `volumes`.
+
+:white_check_mark: The primary reason why, we do this is to manage all secrets in a central place like `Hashicorp Vault` or `AWS Secrets Manager` and it is pulled `dynamically` and not managed `natively` or `locally` within the `k8s pods`.
+
+:white_check_mark: These Secrets are fetched only during the `runtime` i.e. only when the application is executed or a specific function is executed so that it needs the `secrets` to complete the execution successfully, so you don't need to check secrets in `Git` because it is not stored in the `pod` or `secrets`.
+
+##### How does this `Secret Store CSI Driver` work?
+
+
+We have our `k8s cluster` and we'll install the `Secret Store CSI Driver` in it.
+
+
 
 
 
