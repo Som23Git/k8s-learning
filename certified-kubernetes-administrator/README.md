@@ -3788,6 +3788,13 @@ paswrd
 > * Also, `Secrets` are NOT `encrypted` in ETCD so consider enabling `Encrypting data in REST`.
 > * Anyone who creates pods and deployments in the same `namespace`, can access the `Secrets` as well. So, please make sure you have a RBAC(Role-based access control) to restrict the `secrets` from using the specific pods and NOT all.
 > * As an advanced method, you can make use of storing the `Secrets` in a `third-party secrets store providers` like AWS Provider, Azure Provider, GCP Provider.
+
+---- 
+
+>[!Important]
+> **ADDITIONAL RESOURCES:**
+> Dive deep into the world of Kubernetes security with our comprehensive guide to Secret Store CSI Driver.
+> https://www.youtube.com/watch?v=MTnQW9MxnRI
 > * There are many secrets provider or tools to handle the `secrets` in a `k8s cluster`, tools like - `External Secrets Operator[ESO]`, `Sealed Secrets`, and `Secret Store CSI Driver`.
 
 
@@ -3805,6 +3812,10 @@ paswrd
 
 
 We have our `k8s cluster` and we'll install the `Secret Store CSI Driver` in it.
+
+> Helm is a package Manager and using that, we are installing the `secret store csi driver`.
+
+---- 
 
 
 
