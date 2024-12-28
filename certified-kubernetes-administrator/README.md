@@ -3815,6 +3815,8 @@ We have our `k8s cluster` and we'll install the `Secret Store CSI Driver` in it.
 
 > Helm is a package Manager and using that, we are installing the `secret store csi driver`.
 
+This is where, you install and follow the installation of `Secrets Store CSI Driver`: https://secrets-store-csi-driver.sigs.k8s.io/getting-started/installation.
+
 ---- 
 
 
