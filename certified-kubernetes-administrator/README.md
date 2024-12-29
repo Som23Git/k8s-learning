@@ -71,11 +71,18 @@ ETCD is a reliable key-value store that is secure.
 
 Download the binary, extract and run the etcd service that starts a sercice that listens on 2379(default). The default client is `etcdctl` so you can make use of it store and manage the etcd store. 
 
+```bash
+# To install `etcdctl`:
+
+apt-get install etcd-client
+```
+So, now the `etcdctl` can be accessed.
+
 For example:
 
-```
-./etcdctl set key1 value1 -- works v2.0
-./etcdctl get key1 -- works v2.0
+```bash
+$ ./etcdctl set key1 value1 -- works v2.0
+$ ./etcdctl get key1 -- works v2.0
 ```
 
 > ETCD Versions
@@ -3818,6 +3825,28 @@ We have our `k8s cluster` and we'll install the `Secret Store CSI Driver` in it.
 This is where, you install and follow the installation of `Secrets Store CSI Driver`: https://secrets-store-csi-driver.sigs.k8s.io/getting-started/installation.
 
 ---- 
+
+### Demo on `Encrypting Secret Data at Rest`
+
+You can verify whether the secrets stored in the `ETCD Data Store` is encrypted or NOT encrypted using this [official K8s documentation](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/#verifying-that-data-is-encrypted).
+
+```bash
+# This command from the above documentation, gives us the output whether the secret is stored exposed as PlainText or Encrypted.
+
+$ ETCDCTL_API=3 etcdctl \
+   --cacert=/etc/kubernetes/pki/etcd/ca.crt   \
+   --cert=/etc/kubernetes/pki/etcd/server.crt \
+   --key=/etc/kubernetes/pki/etcd/server.key  \
+   get /registry/secrets/default/secret1 | hexdump -C
+```
+
+So, once you notice that `secret` is stored in `plainText`, then we need to make it `Encrypted`.
+
+> [!Important]
+> Default: The `encryption` will only apply to the `secrets` or `resources` that are created after the `encrytion at rest` is enabled.
+> However, to make the previously created `secrets` to abide with the `encryption at rest`, we need to manually `update` the `secrets` so that it gets encrypted.
+
+----
 
 
 
