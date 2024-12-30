@@ -3897,5 +3897,48 @@ spec:
 ```
 Here the `log-agent` container can communicate with the `webapp` container using the `localhost:8080`  directly.
 
+[Important official K8s documentation - communicate-containers-same-pod-shared-volume](https://kubernetes.io/docs/tasks/access-application-cluster/communicate-containers-same-pod-shared-volume/)
+
+```yaml
+# From official k8s documentation:
+apiVersion: v1
+kind: Pod
+metadata:
+  name: two-containers
+spec:
+
+  restartPolicy: Never
+
+  volumes:
+  - name: shared-data
+    emptyDir: {}
+
+  containers:
+
+  - name: nginx-container
+    image: nginx
+    volumeMounts:
+    - name: shared-data
+      mountPath: /usr/share/nginx/html
+
+  - name: debian-container
+    image: debian
+    volumeMounts:
+    - name: shared-data
+      mountPath: /pod-data
+    command: ["/bin/sh"]
+    args: ["-c", "echo Hello from the debian container > /pod-data/index.html"]
+```
+There are 3 common patterns when it comes to designing multi-container PODs.
+
+The first, and what we just saw with the logging service example, is known as a `sidecar` pattern. 
+The others are the `adapter` and the `ambassador` pattern.
+
+However, these fall under the `CKAD curriculum` and are not required for the `CKA exam`. So, we will discuss these in more detail in the CKAD course.
+
+![logging_service](multi-container-pod-logs-push-architecture.png)
+
 ----
+
+
 
