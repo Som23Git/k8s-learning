@@ -3846,9 +3846,56 @@ So, once you notice that `secret` is stored in `plainText`, then we need to make
 > Default: The `encryption` will only apply to the `secrets` or `resources` that are created after the `encrytion at rest` is enabled.
 > However, to make the previously created `secrets` to abide with the `encryption at rest`, we need to manually `update` the `secrets` so that it gets encrypted.
 
+To create a random 32-byte base64 private key to perform the `encryption`, you can use the `built-in` command:
+
+```bash
+# This command creates a 32-byte key
+$ head -c 32 /dev/urandom | base64
+```
+
+>[!Important]
+> Remember that secrets encode data in base64 format. Anyone with the base64 encoded secret can easily decode it. As such the secrets can be considered not very safe.
+> The concept of safety of the Secrets is a bit confusing in Kubernetes. The Kubernetes documentation page and a lot of blogs out there refer to secrets as a “safer option” to store sensitive data. They are safer than storing in plain text as they reduce the risk of accidentally exposing passwords and other sensitive data. In my opinion, it’s not the secret itself that is safe, it is the practices around it.
+> Secrets are not encrypted, so it is not safer in that sense. However, some best practices around using secrets make it safer. As in best practices like:
+>
+> * Not checking in secret object definition files to source code repositories.
+> * Enabling Encryption at Rest for Secrets so they are stored encrypted in ETCD.
+>
+> Also, the way Kubernetes handles secrets. Such as:
+>
+> * A secret is only sent to a node if a pod on that node requires it.
+> * Kubelet stores the secret into a tmpfs so that the secret is not written to disk storage.
+> * Once the Pod that depends on the secret is deleted, kubelet will delete its local copy of the secret data as well.
+>
+>Read about the [protections](https://kubernetes.io/docs/concepts/configuration/secret/#protections) and [risks](https://kubernetes.io/docs/concepts/configuration/secret/#risks) of using secrets [here](https://kubernetes.io/docs/concepts/configuration/secret/#risks).
+>
+> Having said that, there are other better ways of handling sensitive data like passwords in Kubernetes, such as using tools like Helm Secrets, and [HashiCorp Vault](https://www.vaultproject.io/).
 ----
 
+### Multi-Container Pods
 
+The reason why we use `Multi-Container` pods is because, we want the `containers` to scale up and scale down together. For example, let's make use of a scenario, where we have a `web-server` and it wants to send the Apache logs to an external monitoring application like `Elasticsearch`, in this situation we can make use of a `Log Agent` container along with the `web-server` container so that it can send logs whenever there is a new instance is up and online.
 
+This removes the explicit intervention of adding a new pod and then, attaching it with the `web-server` pod/service(as it will be in different networks) and then, storing it in a `separate volume` and so on. 
 
+Whenever, you have multiple containers within the same pod, it makes the networking simple between them by exchanging information via the `localhost`.
+
+```yaml
+# simple-webapp-with-logs-definition-file.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-with-logs
+spec:
+  containers:
+    - name: simple-webapp-with-logs
+      image: simple-webapp-with-logs
+      ports:
+        - containerPort: 8080
+    - name: log-agent
+      image: log-agent
+```
+Here the `log-agent` container can communicate with the `webapp` container using the `localhost:8080`  directly.
+
+----
 
