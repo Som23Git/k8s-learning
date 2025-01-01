@@ -4022,4 +4022,11 @@ spec:
   - The certificates are stored in a shared volume.
   - The main app uses the certificates to enable secure communication.
 
+> [!TIP]
+> You can just use the `kubectl describe pod` instead of specifying a specific `<pod-name>`, this returns the complete description of all the pods in the `namespace`.
+
+> [!NOTE]
+> Kubernetes supports self-healing applications through ReplicaSets and Replication Controllers. The replication controller helps ensure that a POD is re-created automatically when the application within the POD crashes. It helps in ensuring enough replicas of the application are running at all times.
+> Kubernetes provides additional support to check the health of applications running within PODs and take necessary actions through Liveness and Readiness Probes. However, these are not required for the CKA exam and as such, they are not covered here. These are topics for the Certified Kubernetes Application Developers (CKAD) exam and are covered in the CKAD course.
+
 ----
