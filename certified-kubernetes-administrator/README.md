@@ -3940,5 +3940,93 @@ However, these fall under the `CKAD curriculum` and are not required for the `CK
 
 ----
 
+### InitContainers
+
+Let's talk about `InitContainers`, it is very important and it plays a vital role when deploying large-scale applications because it takes care of all the `setup` operations like `pulling the images`, `configurations`, and most importantly, `generating and storing TLS/SSL certificates`. Let's take an example of our `Elasticsearch` itself, when the nodes are starting up, it expects the TLS/SSL certs to be supplied so that it can communicate with eachother securely. So, the TLS/SSL certificates should be generated before-hand so that it can be passed while it's booting up. In this scenario, the `InitContainers` are much helpful where, it takes care of all the certs generation.
+
+Only if the `InitContainer` completes it's task successfully, the `main container` or the `other containers` are started so basically, it is executed `Sequentially` and it should be `successful` to go for the next.
+
+----
+
+In a multi-container pod, each container is expected to run a process that stays alive as long as the POD's lifecycle.
+
+For example in the multi-container pod that we talked about earlier that has a web application and logging agent, both the containers are expected to stay alive at all times.
+
+The process running in the log agent container is expected to stay alive as long as the web application is running. If any of them fail, the POD restarts.
+
+But at times you may want to run a process that runs to completion in a container. For example, a process that pulls a code or binary from a repository that will be used by the main web application.
+
+That is a task that will be run only one time when the pod is first created. Or a process that waits for an external service or database to be up before the actual application starts.
+
+That's where `initContainers` comes in. An `initContainer` is configured in a pod-like all other containers, except that it is specified inside a initContainers section, like this:
 
 
+```yaml
+# initcontainer-definition.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+  labels:
+    app: myapp
+spec:
+  containers:
+  - name: myapp-container
+    image: busybox:1.28
+    command: ['sh', '-c', 'echo The app is running! && sleep 3600']
+  initContainers:
+  - name: init-myservice
+    image: busybox
+    command: ['sh', '-c', 'git clone  ;']
+
+```
+
+#### An example fetched from ChatGPT:
+
+Your app needs secrets or certificates that are dynamically created or retrieved before it starts.
+
+```yaml
+# example-initcontainer-definition.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secure-app
+spec:
+  containers:
+    - name: app
+      image: mysecureapp:latest
+      volumeMounts:
+        - name: certs
+          mountPath: /etc/certs
+  initContainers:
+    - name: generate-cert
+      image: cert-gen:latest
+      command:
+        - sh
+        - -c
+        - |
+          openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+            -keyout /certs/tls.key -out /certs/tls.crt \
+            -subj "/CN=myapp/O=myorg";
+      volumeMounts:
+        - name: certs
+          mountPath: /certs
+  volumes:
+    - name: certs
+      emptyDir: {}
+```
+
+* **How It Works:**
+  - The Init Container generates TLS certificates using openssl.
+  - The certificates are stored in a shared volume.
+  - The main app uses the certificates to enable secure communication.
+
+> [!TIP]
+> You can just use the `kubectl describe pod` instead of specifying a specific `<pod-name>`, this returns the complete description of all the pods in the `namespace`.
+
+> [!NOTE]
+> Kubernetes supports self-healing applications through ReplicaSets and Replication Controllers. The replication controller helps ensure that a POD is re-created automatically when the application within the POD crashes. It helps in ensuring enough replicas of the application are running at all times.
+> Kubernetes provides additional support to check the health of applications running within PODs and take necessary actions through Liveness and Readiness Probes. However, these are not required for the CKA exam and as such, they are not covered here. These are topics for the Certified Kubernetes Application Developers (CKAD) exam and are covered in the CKAD course.
+
+----
