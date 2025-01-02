@@ -4122,5 +4122,34 @@ cat node01_post_adding_cordon | grep -e "unschedulable"
 Now, it is made schedulable. But, please note, only when the pods are created those pods are scheduled accordingly. So, basically, when you `drain` the nodes, the `taints` are added making the node `unschedulable` to `true` and, then it is removed when we `uncordon` it.
 
 
+----
+
+### Kubernetes Releases and Functions:
+
+```bash
+$ kubectl get nodes
+```
+#### Release Versions:
+v1.11.3
+Major.Minor.Patch
+While Minors are released every few months.
+Features and Functionalities
+
+Patches are released every few weeks or more frequently.
+Bug fixes.
+
+#### Standard software release function and References:
+
+- https://kubernetes.io/docs/concepts/overview/kubernetes-api/
+
+Here is a link to Kubernetes documentation if you want to learn more about this topic (You don’t need it for the exam, though):
+
+- https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md
+
+- https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api_changes.md
+
+----
+
+
 
 
