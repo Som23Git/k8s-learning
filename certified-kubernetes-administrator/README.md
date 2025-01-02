@@ -4029,4 +4029,98 @@ spec:
 > Kubernetes supports self-healing applications through ReplicaSets and Replication Controllers. The replication controller helps ensure that a POD is re-created automatically when the application within the POD crashes. It helps in ensuring enough replicas of the application are running at all times.
 > Kubernetes provides additional support to check the health of applications running within PODs and take necessary actions through Liveness and Readiness Probes. However, these are not required for the CKA exam and as such, they are not covered here. These are topics for the Certified Kubernetes Application Developers (CKAD) exam and are covered in the CKAD course.
 
-----
+----------
+
+## :: Cluster Maintenance
+
+----------
+
+### Operating System Upgrade
+
+```bash
+$ kubectl drain node-1
+```
+
+This command will drain i.e. remove all the pods from the `node-1` and then, `node-1` is left with no workloads i.e. no pods. So, the pods are moved to the other nodes. Technically, in the backend, the pods are NOT moved, it is gracefully Terminated within the `node-1` and then, `recreated` in `node-2` or other nodes.
+
+>[!Important]
+> Once you drain the pods from the `node-1`, the node is marked as `UnSchedulable` and [`Cordon`](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_cordon/).
+> Cordon means: In Kubernetes, the `kubectl cordon` command marks a node as `unschedulable`, preventing new pods from being scheduled on it.
+> Once the nodes are removed and added again, you would need to `uncordon` the `node-1` to schedule the new pods on the node.
+> You need to use `kubectl uncordon node-1` to remove the `cordon` marked in the `node-1`.
+
+
+#### Example Scenario:
+
+Vacating all the pods from the `node01`:
+
+```bash
+# Before vacating the pods from the node - node01
+
+$ kubectl get pods -o wide
+NAME                    READY   STATUS    RESTARTS   AGE    IP           NODE           NOMINATED NODE   READINESS GATES
+blue-56dd475db5-6dhgt   1/1     Running   0          4m1s   172.17.1.2   node01         <none>           <none>
+blue-56dd475db5-6xbjl   1/1     Running   0          4m1s   172.17.0.4   controlplane   <none>           <none>
+blue-56dd475db5-c6zt8   1/1     Running   0          4m1s   172.17.1.3   node01         <none>           <none>
+```
+
+```bash
+# Removing all the pods from the node - node01
+
+$ kubectl drain node01 --force --ignore-daemonsets=true
+node/node01 already cordoned
+Warning: ignoring DaemonSet-managed Pods: kube-flannel/kube-flannel-ds-cr8sj, kube-system/kube-proxy-gmnmv
+evicting pod default/blue-56dd475db5-c6zt8
+evicting pod default/blue-56dd475db5-6dhgt
+pod/blue-56dd475db5-6dhgt evicted
+pod/blue-56dd475db5-c6zt8 evicted
+node/node01 drained
+
+# Post the cordoned:
+
+$ kubectl get pods -o wide
+NAME                    READY   STATUS    RESTARTS   AGE    IP           NODE           NOMINATED NODE   READINESS GATES
+blue-56dd475db5-6xbjl   1/1     Running   0          6m1s   172.17.0.4   controlplane   <none>           <none>
+blue-56dd475db5-9lq2m   1/1     Running   0          105s   172.17.0.6   controlplane   <none>           <none>
+blue-56dd475db5-jpmlk   1/1     Running   0          105s   172.17.0.5   controlplane   <none>           <none>
+
+# Now, checking the number of nodes:
+
+$ kubectl get nodes
+NAME           STATUS                     ROLES           AGE     VERSION
+controlplane   Ready                      control-plane   10m     v1.31.0
+node01         Ready,SchedulingDisabled   <none>          9m35s   v1.31.0
+
+# Uncordoning the node to make it available for scheduling the pods
+
+kubectl uncordon node01
+node/node01 uncordoned
+
+
+# Now, the node01 is `READY`:
+
+kubectl get nodes -o wide
+NAME           STATUS   ROLES           AGE   VERSION   INTERNAL-IP       EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION    CONTAINER-RUNTIME
+controlplane   Ready    control-plane   13m   v1.31.0   192.168.219.165   <none>        Ubuntu 22.04.4 LTS   5.15.0-1072-gcp   containerd://1.6.26
+node01         Ready    <none>          13m   v1.31.0   192.168.212.139   <none>        Ubuntu 22.04.4 LTS   5.15.0-1070-gcp   containerd://1.6.26
+
+```
+
+```bash
+$ kubectl get node node01 -o yaml >> node01_post_adding_cordon.yaml
+cat node01_post_adding_cordon | grep -e "unschedulable"
+...
+...
+    key: node.kubernetes.io/unschedulable
+  unschedulable: true
+    key: node.kubernetes.io/unschedulable
+  unschedulable: true
+...
+...
+```
+
+Now, it is made schedulable. But, please note, only when the pods are created those pods are scheduled accordingly. So, basically, when you `drain` the nodes, the `taints` are added making the node `unschedulable` to `true` and, then it is removed when we `uncordon` it.
+
+
+
+
