@@ -4138,6 +4138,23 @@ Features and Functionalities
 Patches are released every few weeks or more frequently.
 Bug fixes.
 
+`v1.10.0-alpha` - alpha releases are mostly buggy and features are disabled.
+`v1.10.0-beta` - beta releases are where the code is well tested and features are enabled, it's make way to the `major.minor.patch`.
+
+>[!Important]
+> Control-Plane Components:
+> kubeapi-server - v1.13.4
+> kube-scheduler - v1.13.4
+> controller-manager - v1.13.4
+> kubelet - v1.13.4
+> kube-proxy - v1.13.4
+> kubectl - v1.13.4
+> But,
+> ETCD Cluster - v3.2.18
+> CoreDNS - v1.1.3
+
+Note, the `ETCD Cluster` and `CoreDNS` are different projects so that the versions of those components are different.
+
 #### Standard software release function and References:
 
 - https://kubernetes.io/docs/concepts/overview/kubernetes-api/
@@ -4150,6 +4167,39 @@ Here is a link to Kubernetes documentation if you want to learn more about this 
 
 ----
 
+### Cluster Upgrade Process
 
+> [!Warning]
+> Only the latest 3 Major.Minor version are supported in K8s cluster
+> For example, if current latest/stable version release is `v1.14`, and you're cluster is in `v1.10` it is `unsupported` so, you would need to `upgrade` to `v1.11` to be `supported`.
+
+Master node upgrade, does not affect running worker nodes but just the management functions are affected.
+
+Strategy 1 - ReCreate
+Strategy 2 - Rolling Update using `drain` and `cordon`
+Strategy 3 - Add new upgraded nodes to the cluster directly and decommission the old ones but, you can move the workloads to the new nodes before decommisioning.
+
+```bash
+$ kubeadm upgrade plan
+```
+
+
+Commands:
+
+```bash
+## Very Important Commands Before Upgrading:
+
+$ kubeadm version
+$ kubeadm upgrade plan
+$ kubeadm upgrade apply v1.12.0
+
+## Commands to execute the upgrade:
+
+$ apt-get upgrade -y kubeadm=1.12.0-00
+$ apt-get upgrade -y kubelet=1.12.0-00
+$ kubeadm upgrade node config --kubelet-version v1.12.0
+$ systemctl restart kubelet
+
+```
 
 
