@@ -4138,6 +4138,20 @@ Features and Functionalities
 Patches are released every few weeks or more frequently.
 Bug fixes.
 
+`v1.10.0-alpha` - alpha releases are mostly buggy and features are disabled.
+`v1.10.0-beta` - beta releases are where the code is well tested and features are enabled, it's make way to the `major.minor.patch`.
+
+>[!Important]
+> kubeapi-server - v1.13.4
+> kube-scheduler - v1.13.4
+> controller-manager - v1.13.4
+> kubelet - v1.13.4
+> kube-proxy - v1.13.4
+> kubectl - v1.13.4
+> But,
+> ETCD Cluster - v3.2.18
+> CoreDNS - v1.1.3
+
 #### Standard software release function and References:
 
 - https://kubernetes.io/docs/concepts/overview/kubernetes-api/
