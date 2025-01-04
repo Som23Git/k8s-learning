@@ -4182,14 +4182,14 @@ Here is a link to Kubernetes documentation if you want to learn more about this 
  - Upgrade `worker nodes` & upgrade `kubelet` and `kubectl` of the controlplane node.
 
 
-Master node upgrade, does not affect running worker nodes but just the management functions are affected.
+> Master node upgrade, does not affect running worker nodes but just the management functions are affected.
 
-Strategy 1 - ReCreate
-Strategy 2 - Rolling Update using `drain` and `cordon`    --- # Recommended
-Strategy 3 - Add new upgraded nodes to the cluster directly and decommission the old ones but, you can move the workloads to the new nodes before decommisioning.
+* Strategy 1 - ReCreate
+* Strategy 2 - Rolling Update using `drain` and `cordon`    --- # Recommended
+* Strategy 3 - Add new upgraded nodes to the cluster directly and decommission the old ones but, you can move the workloads to the new nodes before decommisioning.
 
 
-Commands Used:
+##### Commands Used:
 
 ```bash
 # You can check the available versions of the kudeadm or kubelet version from the package repository using this command:
