@@ -4170,16 +4170,16 @@ Here is a link to Kubernetes documentation if you want to learn more about this 
 ### Cluster Upgrade Process
 
 > [!Warning]
-> Only the latest 3 Major.Minor version are supported in K8s cluster
-> For example, if current latest/stable version release is `v1.13`, and you're cluster is in `v1.10` it is `unsupported` so, you would need to `upgrade` to `v1.11` to be `supported`. So, the supported versions are `v1.11`, `v1.12`, and `v1.13`.
-> **Highly Recommended:** Please follow the `kubeadm-upgrade` documentation: https://v1-31.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/. Documentations are really important and helpful.
+> * Only the latest 3 Major.Minor version are supported in K8s cluster
+> * For example, if current latest/stable version release is `v1.13`, and you're cluster is in `v1.10` it is `unsupported` so, you would need to `upgrade` to `v1.11` to be `supported`. So, the supported versions are `v1.11`, `v1.12`, and `v1.13`.
+> * **Highly Recommended:** Please follow the `kubeadm-upgrade` documentation: https://v1-31.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/. Documentations are really important and helpful.
 
 * Steps to upgrade:
- - Prerequisites before upgrading: Please note, K8s maintains separate package repositories for each `Minor` versions(ex: upgrading from 1.30 > 1.31), so you would need to update the `package repository` before upgrading each time. Please refer to this [official documentation](https://v1-31.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/change-package-repository/) for more information.
- - Upgrade `kubeadm` first
- - Upgrade `controlplane` node(all components, except the `ETCD datastore` and `CoreDNS`, you can upgrade these two only after upgrading all the controlplane nodes and its core components)
- - Upgrade `kubelet` and `kubectl` of the controlplane node
- - Upgrade `worker nodes` & upgrade `kubelet` and `kubectl` of the controlplane node.
+  - Prerequisites before upgrading: Please note, K8s maintains separate package repositories for each `Minor` versions(ex: upgrading from 1.30 > 1.31), so you would need to update the `package repository` before upgrading each time. Please refer to this [official documentation](https://v1-31.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/change-package-repository/) for more information.
+  - Upgrade `kubeadm` first
+  - Upgrade `controlplane` node(all components, except the `ETCD datastore` and `CoreDNS`, you can upgrade these two only after upgrading all the controlplane nodes and its core components)
+  - Upgrade `kubelet` and `kubectl` of the controlplane node
+  - Upgrade `worker nodes` & upgrade `kubelet` and `kubectl` of the controlplane node.
 
 
 > Master node upgrade, does not affect running worker nodes but just the management functions are affected.
