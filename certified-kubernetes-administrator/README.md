@@ -4192,22 +4192,172 @@ Here is a link to Kubernetes documentation if you want to learn more about this 
 ##### Commands Used:
 
 ```bash
-# You can check the available versions of the kudeadm or kubelet version from the package repository using this command:
+$ vi /etc/apt/sources.list.d/kubernetes.list
 
-$ apt-cache madison kubelet
-$ apt-cache madison kubeadm
+deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /
 
+Please note, you would need to modify the version v1.30 to the Minor version you would like to upgrade to i.e. v1.31 so that the package repositories are pulled from that version
 ```
 
 ```bash
+# You can check the available versions of the kudeadm or kubelet version from the package repository using this command:
+
+$ sudo apt-cache madison kubeadm
+
+   kubeadm | 1.31.4-1.1 | https://pkgs.k8s.io/core:/stable:/v1.31/deb  Packages
+   kubeadm | 1.31.3-1.1 | https://pkgs.k8s.io/core:/stable:/v1.31/deb  Packages
+   kubeadm | 1.31.2-1.1 | https://pkgs.k8s.io/core:/stable:/v1.31/deb  Packages
+   kubeadm | 1.31.1-1.1 | https://pkgs.k8s.io/core:/stable:/v1.31/deb  Packages
+   kubeadm | 1.31.0-1.1 | https://pkgs.k8s.io/core:/stable:/v1.31/deb  Packages
+
+$ apt-cache madison kubelet
+
+   kubelet | 1.31.4-1.1 | https://pkgs.k8s.io/core:/stable:/v1.31/deb  Packages
+   kubelet | 1.31.3-1.1 | https://pkgs.k8s.io/core:/stable:/v1.31/deb  Packages
+   kubelet | 1.31.2-1.1 | https://pkgs.k8s.io/core:/stable:/v1.31/deb  Packages
+   kubelet | 1.31.1-1.1 | https://pkgs.k8s.io/core:/stable:/v1.31/deb  Packages
+   kubelet | 1.31.0-1.1 | https://pkgs.k8s.io/core:/stable:/v1.31/deb  Packages
+```
+
 ## Very Important Commands Before Upgrading:
 
+```bash
 $ kubeadm version
+
+# Sample output response:
+kubeadm version: &version.Info{Major:"1", Minor:"31", GitVersion:"v1.31.0", GitCommit:"9edcffcde5595e8a5b1a35f88c421764e575afce", GitTreeState:"clean", BuildDate:"2024-08-13T07:35:57Z", GoVersion:"go1.22.5", Compiler:"gc", Platform:"linux/amd64"}
+```
+
+```bash
 $ kubeadm upgrade plan
-$ kubeadm upgrade apply v1.12.0
+
+# Sample output response:
+
+kubeadm upgrade plan
+[preflight] Running pre-flight checks.
+[upgrade/config] Reading configuration from the cluster...
+[upgrade/config] FYI: You can look at this config file with 'kubectl -n kube-system get cm kubeadm-config -o yaml'
+[upgrade] Running cluster health checks
+[upgrade] Fetching available versions to upgrade to
+[upgrade/versions] Cluster version: 1.31.0
+[upgrade/versions] kubeadm version: v1.31.0
+I0105 01:27:56.380091   40368 version.go:261] remote version is much newer: v1.32.0; falling back to: stable-1.31
+[upgrade/versions] Target version: v1.31.4
+[upgrade/versions] Latest version in the v1.31 series: v1.31.4
+
+Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
+COMPONENT   NODE           CURRENT   TARGET
+kubelet     controlplane   v1.31.0   v1.31.4        ########## Both the nodes upgraded successfully to v1.31.0 from v1.30.0
+kubelet     node01         v1.31.0   v1.31.4        ########## Both the nodes upgraded successfully to v1.31.0 from v1.30.0
+
+Upgrade to the latest version in the v1.31 series:
+
+COMPONENT                 NODE           CURRENT    TARGET
+kube-apiserver            controlplane   v1.31.0    v1.31.4
+kube-controller-manager   controlplane   v1.31.0    v1.31.4
+kube-scheduler            controlplane   v1.31.0    v1.31.4
+kube-proxy                               1.31.0     v1.31.4
+CoreDNS                                  v1.11.1    v1.11.1
+etcd                      controlplane   3.5.15-0   3.5.15-0
+
+You can now apply the upgrade by executing the following command:
+
+        kubeadm upgrade apply v1.31.4
+
+Note: Before you can perform this upgrade, you have to update kubeadm to v1.31.4.
+
+_____________________________________________________________________
+
+
+The table below shows the current state of component configs as understood by this version of kubeadm.
+Configs that have a "yes" mark in the "MANUAL UPGRADE REQUIRED" column require manual config upgrade or
+resetting to kubeadm defaults before a successful upgrade can be performed. The version to manually
+upgrade to is denoted in the "PREFERRED VERSION" column.
+
+API GROUP                 CURRENT VERSION   PREFERRED VERSION   MANUAL UPGRADE REQUIRED
+kubeproxy.config.k8s.io   v1alpha1          v1alpha1            no
+kubelet.config.k8s.io     v1beta1           v1beta1             no
+_____________________________________________________________________
+```
+
+```bash
+# replace x in 1.31.x-* with the latest patch version
+sudo apt-mark unhold kubeadm && \
+sudo apt-get update && sudo apt-get install -y kubeadm='1.31.0-1.1' && \
+sudo apt-mark hold kubeadm
+
+Canceled hold on kubeadm.
+Hit:2 https://download.docker.com/linux/ubuntu jammy InRelease                                                                                                
+Hit:1 https://prod-cdn.packages.k8s.io/repositories/isv:/kubernetes:/core:/stable:/v1.31/deb  InRelease                                                       
+Hit:3 http://archive.ubuntu.com/ubuntu jammy InRelease                                                
+Get:4 http://security.ubuntu.com/ubuntu jammy-security InRelease [129 kB]
+Get:5 http://archive.ubuntu.com/ubuntu jammy-updates InRelease [128 kB]
+Hit:6 http://archive.ubuntu.com/ubuntu jammy-backports InRelease  
+Fetched 257 kB in 1s (295 kB/s)
+Reading package lists... Done
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following packages will be upgraded:
+  kubeadm
+1 upgraded, 0 newly installed, 0 to remove and 25 not upgraded.
+Need to get 11.4 MB of archives.
+After this operation, 8040 kB of additional disk space will be used.
+Get:1 https://prod-cdn.packages.k8s.io/repositories/isv:/kubernetes:/core:/stable:/v1.31/deb  kubeadm 1.31.0-1.1 [11.4 MB]
+Fetched 11.4 MB in 0s (46.7 MB/s)
+debconf: delaying package configuration, since apt-utils is not installed
+(Reading database ... 13733 files and directories currently installed.)
+Preparing to unpack .../kubeadm_1.31.0-1.1_amd64.deb ...
+Unpacking kubeadm (1.31.0-1.1) over (1.30.0-1.1) ...
+Setting up kubeadm (1.31.0-1.1) ...
+kubeadm set on hold.
+```
+
+and,
+
+```bash
+sudo apt-mark unhold kubelet kubectl && \
+sudo apt-get update && sudo apt-get install -y kubelet='1.31.0-1.1' kubectl='1.31.0-1.1' && \
+sudo apt-mark hold kubelet kubectl
+
+Canceled hold on kubelet.
+Canceled hold on kubectl.
+Hit:2 https://download.docker.com/linux/ubuntu jammy InRelease                                   
+Hit:3 http://archive.ubuntu.com/ubuntu jammy InRelease                                                 
+Hit:4 http://security.ubuntu.com/ubuntu jammy-security InRelease                                       
+Hit:5 http://archive.ubuntu.com/ubuntu jammy-updates InRelease                                         
+Hit:1 https://prod-cdn.packages.k8s.io/repositories/isv:/kubernetes:/core:/stable:/v1.31/deb  InRelease
+Hit:6 http://archive.ubuntu.com/ubuntu jammy-backports InRelease
+Reading package lists... Done
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following packages will be upgraded:
+  kubectl kubelet
+2 upgraded, 0 newly installed, 0 to remove and 24 not upgraded.
+Need to get 26.4 MB of archives.
+After this operation, 18.3 MB disk space will be freed.
+Get:1 https://prod-cdn.packages.k8s.io/repositories/isv:/kubernetes:/core:/stable:/v1.31/deb  kubectl 1.31.0-1.1 [11.2 MB]
+Get:2 https://prod-cdn.packages.k8s.io/repositories/isv:/kubernetes:/core:/stable:/v1.31/deb  kubelet 1.31.0-1.1 [15.2 MB]
+Fetched 26.4 MB in 0s (69.4 MB/s) 
+debconf: delaying package configuration, since apt-utils is not installed
+(Reading database ... 13733 files and directories currently installed.)
+Preparing to unpack .../kubectl_1.31.0-1.1_amd64.deb ...
+Unpacking kubectl (1.31.0-1.1) over (1.30.0-1.1) ...
+Preparing to unpack .../kubelet_1.31.0-1.1_amd64.deb ...
+Unpacking kubelet (1.31.0-1.1) over (1.30.0-1.1) ...
+dpkg: warning: unable to delete old directory '/etc/sysconfig': Directory not empty
+Setting up kubectl (1.31.0-1.1) ...
+Setting up kubelet (1.31.0-1.1) ...
+kubelet set on hold.
+kubectl set on hold.
+```
+
 
 ## Commands to execute the upgrade:
 
+```bash
+$ kubeadm upgrade apply v1.12.0
 $ apt-get upgrade -y kubeadm=1.12.0-00    
 $ apt-get upgrade -y kubelet=1.12.0-00
 $ kubeadm upgrade node config --kubelet-version v1.12.0
@@ -4216,3 +4366,48 @@ $ systemctl restart kubelet
 ```
 
 -----
+
+### Backup and Restore
+
+What are the resources will you backup? What are the Backup Candidates?
+
+The backup candidates are the resource configurations and the ETCD Cluster.
+
+> For Resource Configurations, if you use the `Declarative` way to implement the objects/resources, then the files are stored as a definition file accordingly but, in `Imperative` implementation, it does not store the same.
+> But, for ETCD Cluster, you can take the `snapshots` using the `snapshot save` option so that it can be taken backup accordingly.
+
+**WORKING WITH ETCDCTL**
+
+`etcdctl` is a command line client for `etcd`.
+
+In all our `Kubernetes` Hands-on labs, the `ETCD key-value` database is deployed as a static pod on the master. The version used is `v3`.
+
+To make use of `etcdctl` for tasks such as `back up and restore`, make sure that you set the `ETCDCTL_API` to `3`.
+
+You can do this by exporting the variable `ETCDCTL_API` prior to using the `etcdctl` client. This can be done as follows:
+
+```bash
+export ETCDCTL_API=3
+```
+
+On the Master Node:
+
+![master_node_etcd](master_node_etcd.png)
+
+To see all the options for a specific sub-command, make use of the `-h` or `–help` flag.
+
+For example, if you want to take a `snapshot` of `etcd`, use:
+
+`etcdctl snapshot save -h` and keep a note of the mandatory global options.
+
+Since our `ETCD database` is `TLS-Enabled`, the following options are mandatory:
+
+```
+–cacert               verify certificates of TLS-enabled secure servers using this CA bundle
+
+–cert                  identify secure client using this TLS certificate file
+
+–endpoints=[127.0.0.1:2379] This is the default as ETCD is running on master node and exposed on localhost 2379.
+
+–key                 identify secure client using this TLS key file
+```
