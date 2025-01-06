@@ -4375,6 +4375,7 @@ The backup candidates are the resource configurations and the ETCD Cluster.
 
 > For Resource Configurations, if you use the `Declarative` way to implement the objects/resources, then the files are stored as a definition file accordingly but, in `Imperative` implementation, it does not store the same.
 > But, for ETCD Cluster, you can take the `snapshots` using the `snapshot save` option so that it can be taken backup accordingly.
+> Also, `Persistent Volumes`.
 
 **WORKING WITH ETCDCTL**
 
@@ -4410,4 +4411,73 @@ Since our `ETCD database` is `TLS-Enabled`, the following options are mandatory:
 –endpoints=[127.0.0.1:2379] This is the default as ETCD is running on master node and exposed on localhost 2379.
 
 –key                 identify secure client using this TLS key file
+
+```
+#### Taking Snapshot Using ETCDCTL Options:
+
+Refer to this official documentation: https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#snapshot-using-etcdctl-options
+
+```bash
+
+export ETCDCTL_API=3
+
+# Command used to backup i.e. `snapshot ETCD`
+
+etcdctl --endpoints=https://127.0.0.1:2379 \
+  --cacert="/etc/kubernetes/pki/etcd/ca.crt" --cert="/etc/kubernetes/pki/etcd/server.crt" --key="/etc/kubernetes/pki/etcd/server.key" \
+  snapshot save /opt/snapshot-pre-boot.db
+```
+
+While restoring the snapshot:
+
+```bash
+$ cat etcd-backup-and-restore.md 
+1. Get etcdctl utility if it's not already present.
+go get github.com/coreos/etcd/etcdctl
+
+2. Backup
+ETCDCTL_API=3 etcdctl --endpoints=https://[127.0.0.1]:2379 --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+     --cert=/etc/kubernetes/pki/etcd/server.crt --key=/etc/kubernetes/pki/etcd/server.key \
+          snapshot save /opt/snapshot-pre-boot.db
+
+          -----------------------------
+
+          Disaster Happens
+
+          -----------------------------
+3. Restore ETCD Snapshot to a new folder
+ETCDCTL_API=3 etcdctl --endpoints=https://[127.0.0.1]:2379 --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+     --name=master \
+     --cert=/etc/kubernetes/pki/etcd/server.crt --key=/etc/kubernetes/pki/etcd/server.key \
+     --data-dir /var/lib/etcd-from-backup \
+     --initial-cluster=master=https://127.0.0.1:2380 \
+     --initial-cluster-token etcd-cluster-1 \
+     --initial-advertise-peer-urls=https://127.0.0.1:2380 \
+     snapshot restore /opt/snapshot-pre-boot.db
+
+ 4. Modify /etc/kubernetes/manifests/etcd.yaml
+ Update --data-dir to use new target location
+ --data-dir=/var/lib/etcd-from-backup
+
+ Update new initial-cluster-token to specify new cluster
+ --initial-cluster-token=etcd-cluster-1
+
+ Update volumes and volume mounts to point to new path
+      volumeMounts:
+          - mountPath: /var/lib/etcd-from-backup
+            name: etcd-data
+          - mountPath: /etc/kubernetes/pki/etcd
+            name: etcd-certs
+   hostNetwork: true
+   priorityClassName: system-cluster-critical
+   volumes:
+   - hostPath:
+       path: /var/lib/etcd-from-backup
+       type: DirectoryOrCreate
+     name: etcd-data
+   - hostPath:
+       path: /etc/kubernetes/pki/etcd
+       type: DirectoryOrCreate
+     name: etcd-certs
+
 ```
