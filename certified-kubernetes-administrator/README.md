@@ -4567,3 +4567,92 @@ To do list:
 
 
 -----
+
+References K8s documentation:
+
+* https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#backing-up-an-etcd-cluster 
+* https://github.com/etcd-io/website/blob/main/content/en/docs/v3.5/op-guide/recovery.md 
+* https://www.youtube.com/watch?v=qRPNuT080Hk
+
+----------
+
+## :: Security
+
+----------
+
+Primitives - Elementary or Fundamentals
+
+### K8s Security Primitives:
+
+In the core-components, we should start with `kube-apiserver`
+
+We should know:
+
+* Who Can Access?
+
+It is defined by the authentication mechanism, there are different ways to authenticate to the `api-server`
+
+- Files - Username and Passwords
+- Files - Username and Tokens
+- Certificates
+- External Authentication Providers - LDAP
+- Service Accounts
+
+* What can they do?
+
+Once the user gain Access to control, what can they do? It is defined by the `Authorization` Mechanisms:
+
+- RBAC Authorization
+- ABAC Authorization
+- Node Authorization
+- Webhook Mode
+
+All communications between the various components in the cluster is secured using the `TLS encryptions`:
+
+We can even restrict the pods accessing other pods using the `Network Policies`.
+
+----
+
+### Authentication
+
+All users access are managed by `kube-apiserver`, how does the `kube-apiserver` authenticate?
+
+You can use:
+
+- Static Password File
+- Static Token File
+- Certificates
+- Identity Services, like LDAP & Kerberos
+
+Let's start with a simplest form of authentication:
+
+We can make use of the `Static Password File` and `Static Token File`:
+
+Like for example:
+
+```csv
+# static-password-file.csv
+user1, password123, u0001
+user2, password321, u0002
+user3, password092, u0003
+```
+```csv
+# static-token-file.csv
+R/buQPCACziovsv80xvfCxEg9S3lbtyoUdg3sC4ZiBE=, password123, u0001
+B8eATQX2aZupbqowegAUiIb6+Ive+ERz1DIO5ECL/fs=, password321, u0002
+15Wkmy1lmzxbEDSWYe3uFkhP8bUAqZ8x/LuIwhRpnG4=, password092, u0003
+```
+
+>[!Important]
+> This is NOT a recommended authentication mechanism
+> Consider Volume Mount while providing the auth file in a `kubeadm` setup
+> Setup Role Based Authorization for the new users
+
+
+
+
+
+
+
+
+
