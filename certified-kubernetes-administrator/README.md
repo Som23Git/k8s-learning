@@ -4664,6 +4664,8 @@ Goals:
 - How to view them?
 - How to troubleshoot issues related to certificates
 
+### TLS Basics
+
 #### TLS Certificates Pre-Requisites
 
 ##### Symmetric Encryption:
@@ -4782,4 +4784,46 @@ I created a website(blogger.com), now I want this website to be secured with `HT
 
 ![https_secure_communication](https_secure_communication.png)
 
+```mermaid
+sequenceDiagram
+participant Client
+participant Server
+participant CA
+
+Note over Client,Server: SSH Communication
+Client->>Server: Initiates SSH connection
+Server-->>Client: Sends public key
+Client->>Server: Verifies server's public key (via known_hosts)
+Client->>Server: Exchanges symmetric key (via key exchange)
+Server-->>Client: Securely establishes SSH session
+```
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+    participant CA
+
+    %% HTTPS Communication
+    Note over Client Server CA: HTTPS Communication
+    Client->>Server: Initiates HTTPS connection
+    Server-->>Client: Sends SSL/TLS certificate
+    Client->>CA: Verifies certificate authenticity
+    CA-->>Client: Confirms validity of certificate
+    Client->>Server: Exchanges symmetric key (via TLS handshake)
+    Server-->>Client: Securely establishes HTTPS session
+```
+```mermaid
+sequenceDiagram
+Alice->>John: Hello John, how are you?
+loop HealthCheck
+    John->>John: Fight against hypochondria
+end
+Note right of John: Rational thoughts!
+John-->>Alice: Great!
+John->>Bob: How about you?
+Bob-->>John: Jolly good!
+```
 -----
+
+### TLS in kubernetes
+
