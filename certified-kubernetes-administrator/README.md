@@ -4804,7 +4804,7 @@ sequenceDiagram
     participant CA
 
     %% HTTPS Communication
-    Note over Client Server CA: HTTPS Communication
+    Note over Client,CA: HTTPS Communication
     Client->>Server: Initiates HTTPS connection
     Server-->>Client: Sends SSL/TLS certificate
     Client->>CA: Verifies certificate authenticity
