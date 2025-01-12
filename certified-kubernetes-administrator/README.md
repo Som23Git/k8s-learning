@@ -4774,6 +4774,12 @@ Here is the workflow, with a scenario:
 
 I created a website(blogger.com), now I want this website to be secured with `HTTPS`.
 
+- As a prerequisite, I'll use the `openssl genrsa -out private.key 2048` command to create a `server's private key`. Now, you can create a `public key` using the `private key` and sign the `CSR`. 
+
 - First, I'll create a `CSR` with all the `domain name` - blogger.com and the `subject alternative name (SANs)` - blog.blogger.com, xyz.blogger.com, *.blogger.com and send it to the `Trusted CAs` like `Symantec` or `DigiCert`.
 - They'll validate the certificate and send me the `signed certificate` so the server i.e. the website can send it to the clients to validate and run a secure connection.
-- 
+- By fetching the `certificate` from the `server`, it knows the `CA` who signed the certificate and it uses the `CA's public key` and reaches out to the `server` for the `server's public key`. Once, the `server offers the public key`. The client `encrypts` its `symmetric key` i.e. its `client's private key` using the `server's public key` and send it to the `server`. Now, the `server` decrypts the encrypted symmetric key using it's `private key`. So, that, the data between the `client` and the `server` can be hashed using this `symmetric key`.
+
+![https_secure_communication](https_secure_communication.png)
+
+-----
