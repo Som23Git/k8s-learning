@@ -4652,8 +4652,134 @@ B8eATQX2aZupbqowegAUiIb6+Ive+ERz1DIO5ECL/fs=, password321, u0002
 
 ### TLS Introduction
 
+Securing a cluster with the TLS certificates is challenging.
 
 
+Goals:
+
+- What are TLS certificates?
+- How does K8s use certificates?
+- How to generate them?
+- How to configure them?
+- How to view them?
+- How to troubleshoot issues related to certificates
+
+#### TLS Certificates Pre-Requisites
+
+##### Symmetric Encryption:
+
+The Server and the Client using a same key to `encrypt` and `decrypt` the data, so the client has to pass the `key` to the `server` to decrypt so the man-in-the-middle attack is very possible when you pass the key.
 
 
+##### Asymmetric Encryption:
 
+It uses a `pair` of keys - `Private` key and `Public` key.
+
+Consider `Public key` as a `Public Lock`
+
+```bash
+# To generate a private key
+$ openssl genrsa -out my-bank.key 1024
+my-bank.key
+
+# To generate a public key
+$ openssl rsa -in my-bank.key -pubout > mybank.pem
+my-bank.key mybank.pem
+```
+
+Please note, `ssh key-gen` command format is different and `openssl` format is different.
+
+
+Important to notice who signed the certificate:
+
+- Self-signed certificate
+
+Public CA
+
+Private CA
+
+- Trusted CA certificate
+
+What does the `Public Key Infrastructure` do?
+
+Let's see step-by-step:
+
+- There are two methods:
+ * One for `ssh`
+ * One for `https`
+
+##### For `ssh`:
+
+The user can create a `ssh key-gen` where, it will give us a `private key` and `public key` which is known as `id_rsa` and `id_rsa.pub`:
+
+Commands that are used to generate the `ssh certificates`
+
+```bash
+$ ssh-keygen -t rsa -b 4096
+$ ssh-keygen -t dsa 
+$ ssh-keygen -t ecdsa -b 521
+$ ssh-keygen -t ed25519
+```
+So, basically once this `public key` i.e. `id_rsa.pub` is generated, we can `copy-paste` this key in the `server/host` where the applications are hosted so that we can gain access to that `server`.
+
+Once, you type `ssh -i id_rsa user@server`, as you parsed the `private key - id_rsa`, it is easier when the `server` provides you with the `public key` so that you can decrypt and login to the server successfully.
+
+Here is the workflow:
+
+![ssh_key_architecture](ssh_key_architecture.png)
+
+-----
+
+>[!Caution]
+> Please note, whenever you see an `http`, you should keep in mind that the `data` that is passed via the `client` and to the `server` is NOT encrypted so basically, it can be exposed to the `man-in-the-middle` attack i.e. if someone `sniffs` the network packets they should know what is the `data` itself. 
+> Which is why, we use the `HTTPS` protocol to make sure that the `data` within the Network should be masked/abstracted/hashed/encrypted and it can only decrypted on the `server` side.
+
+##### For `HTTPS`:
+
+To communicate securely with the `server` and the `client`, we make use of the `browsers` here:
+
+`Browsers` play an important role in abstracting the `certificate validation` techniques and process from us.
+
+Here are the steps:
+
+- The `user` enters a domain name `https://www.website.com` in the `browser`, so the moment user enters the domain name, the specific domain goes to the DNS and reaches the specific server that is hosted the domain. It will issue a `server` certificate which is the `public` certificate with the `signed by` values i.e. whether it is `self-signed certificate` or the `Trusted CA certificate`.
+- This `public key` is validated by the `Browser` under-the-hood certificate process and then, opens the certificate and gets the `public key`. Now, the browser uses that `CA Trusted public key` and retrieves the `server's public key`.
+- Now, by making use of the `server's public key`, it encrypts the `client's private key` i.e. the symmentric key. And, it is sent to the `Server`. Now, the server decrypts the `symmetric key` using it's `server's private key`. Now, this `symmetric key` is used for communication. Basically, the `Browser` generates only one `private key` i.e. the `symmetric key`.
+
+How are the Trusted CA Server Certificates are generated?
+
+- First, the server need to create a `CSR` - Certificate Signing Request using the valid domain name i.e. `Common Name`, and `Subject Alternative Names` (SANs).
+- Validation, send it to the `CA` for validation so that it can validate and sign the `CSR`.
+- Approved, once the `CA` signed the `CSR`, it issues a `Trusted CA Server Certificate` so that it can be used to present to the `clients`.
+
+Basically, public keys are representated as this:
+
+```
+server.crt
+client.crt
+server.pem
+client.pem
+```
+
+Private key files are representated as this:
+
+```
+server-key.crt
+server.key
+client-key.crt
+client.key
+```
+
+Here is the workflow, with a scenario:
+
+I created a website(blogger.com), now I want this website to be secured with `HTTPS`.
+
+- As a prerequisite, I'll use the `openssl genrsa -out private.key 2048` command to create a `server's private key`. Now, you can create a `public key` using the `private key` and sign the `CSR`. 
+
+- First, I'll create a `CSR` with all the `domain name` - blogger.com and the `subject alternative name (SANs)` - blog.blogger.com, xyz.blogger.com, *.blogger.com and send it to the `Trusted CAs` like `Symantec` or `DigiCert`.
+- They'll validate the certificate and send me the `signed certificate` so the server i.e. the website can send it to the clients to validate and run a secure connection.
+- By fetching the `certificate` from the `server`, it knows the `CA` who signed the certificate and it uses the `CA's public key` and reaches out to the `server` for the `server's public key`. Once, the `server offers the public key`. The client `encrypts` its `symmetric key` i.e. its `client's private key` using the `server's public key` and send it to the `server`. Now, the `server` decrypts the encrypted symmetric key using it's `private key`. So, that, the data between the `client` and the `server` can be hashed using this `symmetric key`.
+
+![https_secure_communication](https_secure_communication.png)
+
+-----
