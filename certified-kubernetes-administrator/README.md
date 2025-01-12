@@ -4730,6 +4730,21 @@ Here is the workflow:
 
 ![ssh_key_architecture](ssh_key_architecture.png)
 
+
+```mermaid
+sequenceDiagram
+participant Client
+participant Server
+participant CA
+
+Note over Client,Server: SSH Communication
+Client->>Server: Initiates SSH connection
+Server-->>Client: Sends public key
+Client->>Server: Verifies server's public key (via known_hosts)
+Client->>Server: Exchanges symmetric key (via key exchange)
+Server-->>Client: Securely establishes SSH session
+```
+
 -----
 
 >[!Caution]
@@ -4786,19 +4801,6 @@ I created a website(blogger.com), now I want this website to be secured with `HT
 
 ```mermaid
 sequenceDiagram
-participant Client
-participant Server
-participant CA
-
-Note over Client,Server: SSH Communication
-Client->>Server: Initiates SSH connection
-Server-->>Client: Sends public key
-Client->>Server: Verifies server's public key (via known_hosts)
-Client->>Server: Exchanges symmetric key (via key exchange)
-Server-->>Client: Securely establishes SSH session
-```
-```mermaid
-sequenceDiagram
     participant Client
     participant Server
     participant CA
@@ -4811,17 +4813,6 @@ sequenceDiagram
     CA-->>Client: Confirms validity of certificate
     Client->>Server: Exchanges symmetric key (via TLS handshake)
     Server-->>Client: Securely establishes HTTPS session
-```
-```mermaid
-sequenceDiagram
-Alice->>John: Hello John, how are you?
-loop HealthCheck
-    John->>John: Fight against hypochondria
-end
-Note right of John: Rational thoughts!
-John-->>Alice: Great!
-John->>Bob: How about you?
-Bob-->>John: Jolly good!
 ```
 -----
 
