@@ -4818,3 +4818,102 @@ sequenceDiagram
 
 ### TLS in kubernetes
 
+Let's see how to secure the K8s cluster using the TLS/SSL certificates:
+
+##### Three certificates:
+
+- Root Certificates
+- Server Certificates
+- Client Certificates
+
+Basically, public keys are representated as this:
+
+```
+server.crt
+client.crt
+server.pem
+client.pem
+```
+
+Private key files are representated as this:
+
+```
+server-key.crt
+server.key
+client-key.crt
+client.key
+```
+
+##### K8s Server Components and its certificates/keys:
+
+- Kube API Server - apiserver.crt, apiserver.key
+- etcd Server - etcdserver.crt, etcdserver.key
+- kubelet Server - kubelet.crt, kubelet.key
+
+##### Client Components and its certificates/keys:
+
+- Admin - admin.crt, admin.key
+- kube-scheduler - scheduler.crt, scheduler.key
+- kube-controller-manager - controller-manager.crt, controller-manager.key
+- kube-proxy - kube-proxy.crt, kube-proxy.key
+
+![alt text](certificates_and_components.png)
+
+![alt text](server_and_client_certificates.png)
+
+-----
+
+### TLS in K8s - Certificate Creation
+
+##### Let's start with a `CA Certificate`:
+
+```bash
+# Generating the CA Private Key
+$ openssl genrsa -out ca.key 2048
+```
+
+```bash
+# Generating CSR Certificates so that the CA can sign
+$ openssl req -new -key ca.key -sub "/CN=KUBERNETES-CA" -out ca.csr
+```
+
+```bash
+# With the CSR, SIGN THE CERTIFICATES and generate a ca.crt
+$ openssl x509 -req -in ca.csr -signkey ca.key -out ca.crt
+```
+
+Basically, the `CA self-signs` the certificate using the `private-key` that is generated above.
+
+Now, this `ca.crt` is the `Root Certificate File` and the `ca.key` is the `private key`.
+
+
+##### Let's try for the `Admin User`
+
+```bash
+# Generating the admin Private Key
+$ openssl genrsa -out admin.key 2048
+```
+
+```bash
+# Generating CSR Certificates so that the CA can sign
+$ openssl req -new -key admin.key -sub "/CN=kube-admin" -out admin.csr
+```
+Note, the `CN` can vary, you should use the relevant value.
+
+Or,
+
+```bash
+# Generating CSR Certificates with the Group as System:Masters
+$ openssl req -new -key admin.key -sub "/CN=kube-admin/O=system:masters" -out admin.csr
+```
+
+```bash
+# With the CSR, SIGN THE CERTIFICATES and generate a admin.crt
+$ openssl x509 -req -in admin.csr -CA ca.crt -CAkey ca.key -out admin.crt
+```
+Now, here we are signing the `admin` certificate using the `CA` certificates.
+
+
+
+
+
