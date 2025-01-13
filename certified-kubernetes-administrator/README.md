@@ -4897,15 +4897,13 @@ $ openssl genrsa -out admin.key 2048
 ```bash
 # Generating CSR Certificates so that the CA can sign
 $ openssl req -new -key admin.key -sub "/CN=kube-admin" -out admin.csr
-```
-Note, the `CN` can vary, you should use the relevant value.
-
-Or,
-
-```bash
-# Generating CSR Certificates with the Group as System:Masters
+OR
+# Generating CSR Certificates with the User Group as System:Masters
 $ openssl req -new -key admin.key -sub "/CN=kube-admin/O=system:masters" -out admin.csr
 ```
+Note, the `CN` can vary, you should use the relevant value. Also, specifying `system:masters` means that the we are letting only the `Administrators` in the K8s cluster accessing the pods.
+
+[Here is a K8s official documentation on using the `system:masters`](https://kubernetes.io/docs/setup/best-practices/certificates/#:~:text=In%20the%20above,super%20user%20group.)
 
 ```bash
 # With the CSR, SIGN THE CERTIFICATES and generate a admin.crt
@@ -4914,6 +4912,134 @@ $ openssl x509 -req -in admin.csr -CA ca.crt -CAkey ca.key -out admin.crt
 Now, here we are signing the `admin` certificate using the `CA` certificates.
 
 
+##### Let's create it for `kube-scheduler`
 
+```bash
+# Generating the admin Private Key
+$ openssl genrsa -out scheduler.key 2048
+```
 
+```bash
+# Generating CSR Certificates so that the CA can sign
+$ openssl req -new -key scheduler.key -sub "/CN=system:kube-scheduler" -out scheduler.csr
+```
 
+```bash
+# With the CSR, SIGN THE CERTIFICATES and generate a admin.crt
+$ openssl x509 -req -in scheduler.csr -CA ca.crt -CAkey ca.key -out scheduler.crt
+```
+
+##### Now, for `Controller-Manager`
+
+```bash
+# Generating the admin Private Key
+$ openssl genrsa -out controller-manager.key 2048
+```
+
+```bash
+# Generating CSR Certificates so that the CA can sign
+$ openssl req -new -key controller-manager.key -sub "/CN=system:kube-controller-manager" -out controller-manager.csr
+```
+
+```bash
+# With the CSR, SIGN THE CERTIFICATES and generate a admin.crt
+$ openssl x509 -req -in controller-manager.csr -CA ca.crt -CAkey ca.key -out controller-manager.crt
+```
+
+Please note, we added `system:core_components` name because, those components are a part of the `control plane`.
+
+##### It's now the turn for `Kube-Proxy`
+
+```bash
+# Generating the admin Private Key
+$ openssl genrsa -out kube-proxy.key 2048
+```
+
+```bash
+# Generating CSR Certificates so that the CA can sign
+$ openssl req -new -key kube-proxy.key -sub "/CN=kube-proxy" -out kube-proxy.csr
+```
+
+```bash
+# With the CSR, SIGN THE CERTIFICATES and generate a admin.crt
+$ openssl x509 -req -in kube-proxy.csr -CA ca.crt -CAkey ca.key -out kube-proxy.crt
+```
+
+##### Let's see the `Server Side` Certificates
+
+etcdserver certificates
+
+kube-apiserver
+
+```bash
+$ openssl req -new -key apiserver.key -subj "/CN=kube-apiserver" -out apiserver.csr --config openssl.cnf
+```
+
+```bash
+# openssl.cnf
+[req]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = kubernetes
+DNS.2 = kubernetes.default
+DNS.3 = kubernetes.default.svc
+DNS.4 = kubernetes.default.svc.cluster.local
+IP.1 = 10.96.0.1
+IP.2 = 192.168.5.11
+IP.3 = 192.168.5.12
+IP.4 = 192.168.5.30
+IP.5 = 127.0.0.1
+```
+
+```bash
+$ openssl x509 -req -in apiserver.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out apiserver.crt -extensions v3_req -extfile openssl.cnf -days 1000
+```
+
+Kubelet Server
+
+```
+system:node:node01
+```
+```
+group:nodes
+```
+-----
+
+##### View Certificate Details
+
+If the services are configured as `native` services, then use:
+
+```bash
+$ journalctl -u etcd.service -l
+```
+
+If the services are configured as `pods` while using `kubeadm` then, inspect using the `kubectl` utility.
+
+```bash
+$ kubectl logs <pod-name>
+```
+Sometimes, the core-components like the `kube-apiserver` or `etcd-server` is not working, then the `kubectl` will NOT help.
+
+So, we need to dig through the `docker logs` to identify what happened.
+
+```bash
+$ docker ps -a
+$ docker logs <container-id>
+```
+
+Or, you can use the `crictl logs` to understand what happened, if the `kubectl` is not responding.
+
+Certificate Health Check Spreadsheet I have uploaded the Kubernetes Certificate Health Check Spreadsheet here:
+
+https://github.com/mmumshad/kubernetes-the-hard-way/tree/master/tools
+
+Feel free to send in a pull request if you improve it.
+
+[Kubernetes Certificates Checker Spreadsheet](kubernetes-certs-checker.xlsx)
+
+-----
