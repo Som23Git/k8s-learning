@@ -4664,6 +4664,8 @@ Goals:
 - How to view them?
 - How to troubleshoot issues related to certificates
 
+### TLS Basics
+
 #### TLS Certificates Pre-Requisites
 
 ##### Symmetric Encryption:
@@ -4728,6 +4730,21 @@ Here is the workflow:
 
 ![ssh_key_architecture](ssh_key_architecture.png)
 
+
+```mermaid
+sequenceDiagram
+participant Client
+participant Server
+participant CA
+
+Note over Client,Server: SSH Communication
+Client->>Server: Initiates SSH connection
+Server-->>Client: Sends public key
+Client->>Server: Verifies server's public key (via known_hosts)
+Client->>Server: Exchanges symmetric key (via key exchange)
+Server-->>Client: Securely establishes SSH session
+```
+
 -----
 
 >[!Caution]
@@ -4781,5 +4798,248 @@ I created a website(blogger.com), now I want this website to be secured with `HT
 - By fetching the `certificate` from the `server`, it knows the `CA` who signed the certificate and it uses the `CA's public key` and reaches out to the `server` for the `server's public key`. Once, the `server offers the public key`. The client `encrypts` its `symmetric key` i.e. its `client's private key` using the `server's public key` and send it to the `server`. Now, the `server` decrypts the encrypted symmetric key using it's `private key`. So, that, the data between the `client` and the `server` can be hashed using this `symmetric key`.
 
 ![https_secure_communication](https_secure_communication.png)
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+    participant CA
+
+    %% HTTPS Communication
+    Note over Client,CA: HTTPS Communication
+    Client->>Server: Initiates HTTPS connection
+    Server-->>Client: Sends SSL/TLS certificate
+    Client->>CA: Verifies certificate authenticity
+    CA-->>Client: Confirms validity of certificate
+    Client->>Server: Exchanges symmetric key (via TLS handshake)
+    Server-->>Client: Securely establishes HTTPS session
+```
+-----
+
+### TLS in kubernetes
+
+Let's see how to secure the K8s cluster using the TLS/SSL certificates:
+
+##### Three certificates:
+
+- Root Certificates
+- Server Certificates
+- Client Certificates
+
+Basically, public keys are representated as this:
+
+```
+server.crt
+client.crt
+server.pem
+client.pem
+```
+
+Private key files are representated as this:
+
+```
+server-key.crt
+server.key
+client-key.crt
+client.key
+```
+
+##### K8s Server Components and its certificates/keys:
+
+- Kube API Server - apiserver.crt, apiserver.key
+- etcd Server - etcdserver.crt, etcdserver.key
+- kubelet Server - kubelet.crt, kubelet.key
+
+##### Client Components and its certificates/keys:
+
+- Admin - admin.crt, admin.key
+- kube-scheduler - scheduler.crt, scheduler.key
+- kube-controller-manager - controller-manager.crt, controller-manager.key
+- kube-proxy - kube-proxy.crt, kube-proxy.key
+
+![alt text](certificates_and_components.png)
+
+![alt text](server_and_client_certificates.png)
+
+-----
+
+### TLS in K8s - Certificate Creation
+
+##### Let's start with a `CA Certificate`:
+
+```bash
+# Generating the CA Private Key
+$ openssl genrsa -out ca.key 2048
+```
+
+```bash
+# Generating CSR Certificates so that the CA can sign
+$ openssl req -new -key ca.key -sub "/CN=KUBERNETES-CA" -out ca.csr
+```
+
+```bash
+# With the CSR, SIGN THE CERTIFICATES and generate a ca.crt
+$ openssl x509 -req -in ca.csr -signkey ca.key -out ca.crt
+```
+
+Basically, the `CA self-signs` the certificate using the `private-key` that is generated above.
+
+Now, this `ca.crt` is the `Root Certificate File` and the `ca.key` is the `private key`.
+
+
+##### Let's try for the `Admin User`
+
+```bash
+# Generating the admin Private Key
+$ openssl genrsa -out admin.key 2048
+```
+
+```bash
+# Generating CSR Certificates so that the CA can sign
+$ openssl req -new -key admin.key -sub "/CN=kube-admin" -out admin.csr
+OR
+# Generating CSR Certificates with the User Group as System:Masters
+$ openssl req -new -key admin.key -sub "/CN=kube-admin/O=system:masters" -out admin.csr
+```
+Note, the `CN` can vary, you should use the relevant value. Also, specifying `system:masters` means that the we are letting only the `Administrators` in the K8s cluster accessing the pods.
+
+[Here is a K8s official documentation on using the `system:masters`](https://kubernetes.io/docs/setup/best-practices/certificates/#:~:text=In%20the%20above,super%20user%20group.)
+
+```bash
+# With the CSR, SIGN THE CERTIFICATES and generate a admin.crt
+$ openssl x509 -req -in admin.csr -CA ca.crt -CAkey ca.key -out admin.crt
+```
+Now, here we are signing the `admin` certificate using the `CA` certificates.
+
+
+##### Let's create it for `kube-scheduler`
+
+```bash
+# Generating the admin Private Key
+$ openssl genrsa -out scheduler.key 2048
+```
+
+```bash
+# Generating CSR Certificates so that the CA can sign
+$ openssl req -new -key scheduler.key -sub "/CN=system:kube-scheduler" -out scheduler.csr
+```
+
+```bash
+# With the CSR, SIGN THE CERTIFICATES and generate a admin.crt
+$ openssl x509 -req -in scheduler.csr -CA ca.crt -CAkey ca.key -out scheduler.crt
+```
+
+##### Now, for `Controller-Manager`
+
+```bash
+# Generating the admin Private Key
+$ openssl genrsa -out controller-manager.key 2048
+```
+
+```bash
+# Generating CSR Certificates so that the CA can sign
+$ openssl req -new -key controller-manager.key -sub "/CN=system:kube-controller-manager" -out controller-manager.csr
+```
+
+```bash
+# With the CSR, SIGN THE CERTIFICATES and generate a admin.crt
+$ openssl x509 -req -in controller-manager.csr -CA ca.crt -CAkey ca.key -out controller-manager.crt
+```
+
+Please note, we added `system:core_components` name because, those components are a part of the `control plane`.
+
+##### It's now the turn for `Kube-Proxy`
+
+```bash
+# Generating the admin Private Key
+$ openssl genrsa -out kube-proxy.key 2048
+```
+
+```bash
+# Generating CSR Certificates so that the CA can sign
+$ openssl req -new -key kube-proxy.key -sub "/CN=kube-proxy" -out kube-proxy.csr
+```
+
+```bash
+# With the CSR, SIGN THE CERTIFICATES and generate a admin.crt
+$ openssl x509 -req -in kube-proxy.csr -CA ca.crt -CAkey ca.key -out kube-proxy.crt
+```
+
+##### Let's see the `Server Side` Certificates
+
+etcdserver certificates
+
+kube-apiserver
+
+```bash
+$ openssl req -new -key apiserver.key -subj "/CN=kube-apiserver" -out apiserver.csr --config openssl.cnf
+```
+
+```bash
+# openssl.cnf
+[req]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = kubernetes
+DNS.2 = kubernetes.default
+DNS.3 = kubernetes.default.svc
+DNS.4 = kubernetes.default.svc.cluster.local
+IP.1 = 10.96.0.1
+IP.2 = 192.168.5.11
+IP.3 = 192.168.5.12
+IP.4 = 192.168.5.30
+IP.5 = 127.0.0.1
+```
+
+```bash
+$ openssl x509 -req -in apiserver.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out apiserver.crt -extensions v3_req -extfile openssl.cnf -days 1000
+```
+
+Kubelet Server
+
+```
+system:node:node01
+```
+```
+group:nodes
+```
+-----
+
+##### View Certificate Details
+
+If the services are configured as `native` services, then use:
+
+```bash
+$ journalctl -u etcd.service -l
+```
+
+If the services are configured as `pods` while using `kubeadm` then, inspect using the `kubectl` utility.
+
+```bash
+$ kubectl logs <pod-name>
+```
+Sometimes, the core-components like the `kube-apiserver` or `etcd-server` is not working, then the `kubectl` will NOT help.
+
+So, we need to dig through the `docker logs` to identify what happened.
+
+```bash
+$ docker ps -a
+$ docker logs <container-id>
+```
+
+Or, you can use the `crictl logs` to understand what happened, if the `kubectl` is not responding.
+
+Certificate Health Check Spreadsheet I have uploaded the Kubernetes Certificate Health Check Spreadsheet here:
+
+https://github.com/mmumshad/kubernetes-the-hard-way/tree/master/tools
+
+Feel free to send in a pull request if you improve it.
+
+[Kubernetes Certificates Checker Spreadsheet](kubernetes-certs-checker.xlsx)
 
 -----
