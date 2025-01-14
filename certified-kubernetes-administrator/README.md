@@ -5251,11 +5251,13 @@ There are multiple API Groups like:
 Under these groups, they are categorized into two categories `core` and `named`:
 
 ```
-/api - core group
+/api - core group (Now, it's called as Legacy)
 /apis - named group
 ```
 
-Access the kube-api Server:
+Check this [official K8s documentation](https://kubernetes.io/docs/reference/using-api/#:~:text=API%20groups,API%20reference.)
+
+Access the `kube-api` Server:
 
 ```bash
 $ curl http://localhost:6443 -k
