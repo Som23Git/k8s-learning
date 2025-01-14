@@ -5010,7 +5010,7 @@ group:nodes
 ```
 -----
 
-##### View Certificate Details
+### View Certificate Details
 
 If the services are configured as `native` services, then use:
 
@@ -5044,7 +5044,7 @@ Feel free to send in a pull request if you improve it.
 
 -----
 
-##### Certificates API
+### Certificates API
 
 How to manage Certificates and What is the Certificates API:
 
@@ -5169,4 +5169,113 @@ kubectl-auth-can-i(1), kubectl auth can-i(1) - Check whether an action is allowe
 ...
 ... more
 ```
+------
+
+### KubeConfig
+
+```bash
+$ kubectl config view
+```
+
+```yaml
+# kube config definition file:
+$ cat my-kube-config 
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority: /etc/kubernetes/pki/ca.crt
+    server: https://controlplane:6443
+  name: development
+- cluster:
+    certificate-authority: /etc/kubernetes/pki/ca.crt
+    server: https://controlplane:6443
+  name: kubernetes-on-aws
+- cluster:
+    certificate-authority: /etc/kubernetes/pki/ca.crt
+    server: https://controlplane:6443
+  name: production
+- cluster:
+    certificate-authority: /etc/kubernetes/pki/ca.crt
+    server: https://controlplane:6443
+  name: test-cluster-1
+contexts:
+- context:
+    cluster: kubernetes-on-aws
+    user: aws-user
+  name: aws-user@kubernetes-on-aws
+- context:
+    cluster: test-cluster-1
+    user: dev-user
+  name: research
+- context:
+    cluster: development
+    user: test-user
+  name: test-user@development
+- context:
+    cluster: production
+    user: test-user
+  name: test-user@production
+current-context: research
+kind: Config
+preferences: {}
+users:
+- name: aws-user
+  user:
+    client-certificate: /etc/kubernetes/pki/users/aws-user/aws-user.crt
+    client-key: /etc/kubernetes/pki/users/aws-user/aws-user.key
+- name: dev-user
+  user:
+    client-certificate: /etc/kubernetes/pki/users/dev-user/developer-user.crt
+    client-key: /etc/kubernetes/pki/users/dev-user/dev-user.key
+- name: test-user
+  user:
+    client-certificate: /etc/kubernetes/pki/users/test-user/test-user.crt
+    client-key: /etc/kubernetes/pki/users/test-user/test-user.key
+```
+
+-----
+
+### API apiGroups
+
+There are multiple API Groups like:
+
+```
+/metrics
+/version
+/api
+/apis
+/healthz
+/logs
+```
+
+Under these groups, they are categorized into two categories `core` and `named`:
+
+```
+/api - core group
+/apis - named group
+```
+
+Access the kube-api Server:
+
+```bash
+$ curl http://localhost:6443 -k
+```
+
+```bash
+curl http://localhost:6443/apis -k | grep "name"
+```
+
+If you would like to access the api like the above, you would need to pass the `admin.crt` and `admin.key` and `ca.crt` file.
+
+And, as an alternate options to run a `kubectl proxy` using the `port 8001`
+
+```bash
+curl http://localhost:8001 -k
+```
+
+Please note, `kube proxy` and the `kubectl proxy` are NOT the same whereas, the `kubectl proxy` is a HTTP-Server created by the `kubectl` utility to reach the `kube-apiserver`.
+
+----
+
+### Authorization
 
