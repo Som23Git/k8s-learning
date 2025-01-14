@@ -5010,7 +5010,7 @@ group:nodes
 ```
 -----
 
-##### View Certificate Details
+### View Certificate Details
 
 If the services are configured as `native` services, then use:
 
@@ -5043,3 +5043,241 @@ Feel free to send in a pull request if you improve it.
 [Kubernetes Certificates Checker Spreadsheet](kubernetes-certs-checker.xlsx)
 
 -----
+
+### Certificates API
+
+How to manage Certificates and What is the Certificates API:
+
+Make use of the `certificate API` i.e. `kubectl certificate <options>` to approve and deny the requests and we do not need to manually sign the `CSRs` using the `CA` as this API does that for us. This way, we know exactly who we gave access to.
+
+Already I have a CSR request here:
+```bash
+$ cat akshay.csr 
+-----BEGIN CERTIFICATE REQUEST-----
+MIICVjCCAT4CAQAwETEPMA0GA1UEAwwGYWtzaGF5MIIBIjANBgkqhkiG9w0BAQEF
+AAOCAQ8AMIIBCgKCAQEAx2bB1CBAMgBVuQTXXNYapn7sdA2+slGgGP+qGvy6goYY
+lqXTe3Z/OCbGnay0TLN3iiAeX8r0Ios41Sq8prLl7vC8uUTRUwMDLiHO8rqQKZfo
+yj6VvlnFP41QkADjIomu4J0TfD8Dr0c1JMLb3gctUfmhRWZ6N1Azsczobe3bYojG
+6IS4s4ljsUjrUKZB1fgpzJa0lg9B+6wP/gnyBNPWAxUZsR7S7B0bNgSJiOVcLqON
+UQIjFDS7jra14BTvLo7T83xxgA0s24rPjCIWc6z9aB4x5lRMEqdE1u0WoDJT7Utr
+xl/JQbT2RrMsq1tG1XQ2+tLhB+OtXDAnHNcwPQlKcQIDAQABoAAwDQYJKoZIhvcN
+AQELBQADggEBAHqAw5fp74OO98kjrOuH94uEFMHcgij6o3nlLPq9fc7OEvu9TIbC
+TOAj9SutgV8pfgxu6YCc4TGCNs+STV9SwbuOdzLeq/DpCFwFJxyFZm+hgfyOF2Vp
+F/HfGJ9G61efqbApS7fzPa+YB/2ZyWky9PNAHvK0b3e14s0EkM62LNMSc6k2H7o3
+RAIG7lX5KKhtB1JQX8yt0BALyPnd+fCjKl+DMmV9aQsjbSY9XZLQwS+jiImNUKol
+MN2RP1zdDn3Sg3GY+BufZRrDAxbIWFra0o4PFPCHSayeAmMIC6H2Fc9tMw49XBIN
+xMSsLy8CIS2Sf2Dkr9b1g31842rnIxoi8Ts=
+-----END CERTIFICATE REQUEST-----
+```
+Already I have a private key here:
+```bash
+$ cat akshay.key 
+-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDHZsHUIEAyAFW5
+BNdc1hqmfux0Db6yUaAY/6oa/LqChhiWpdN7dn84JsadrLRMs3eKIB5fyvQiizjV
+KrymsuXu8Ly5RNFTAwMuIc7yupApl+jKPpW+WcU/jVCQAOMiia7gnRN8PwOvRzUk
+wtveBy1R+aFFZno3UDOxzOht7dtiiMbohLiziWOxSOtQpkHV+CnMlrSWD0H7rA/+
+CfIE09YDFRmxHtLsHRs2BImI5Vwuo41RAiMUNLuOtrXgFO8ujtPzfHGADSzbis+M
+IhZzrP1oHjHmVEwSp0TW7RagMlPtS2vGX8lBtPZGsyyrW0bVdDb60uEH461cMCcc
+1zA9CUpxAgMBAAECggEABVr2BnSRyM3/v2L5BkAlUdarks/aMOeWj0lRiB1ExJPl
+pekg+YpEjy1ibPJqGrvAsIPdkPjOTv2yem4mCCual4zdYrPtk8dLTvI/QL9gNw/C
+g6kD5Et8q9DnqqBteTxdpyBs2SvHlW3qCFlX5poGfnLAATFIA8OKieJNFUO7vkUO
+OjTHHUMu+WrvNCSXWsrqf2MVZAU4OvLBt5vlhwoHu/kLmkn4D+jQbMSq9cTDRpKD
+4EElM2KF/o5b+0674RSvwDYiuz0C72M9f483mQA2MA/JNh8skAtL+agjR8dHmx8C
+XmnOf3WmVio973iNirqoY6g3mrn8Q2ktiVmL4gnJAQKBgQDTyWCDpcW8FtpZCkFv
+7AY0qcresj6obI3Wg+6DQXzZXtl/tPClf3vLhsL+9uhQBhB2KHo2jAx5wPQITk0E
+cqjDILDxVRdhO3az6tWjlaPH6V4i82fQRBd5mWGvrwbRKGLkAZDXzFo/A/hMxCSY
+gqBye8+eNOrkt0EMCdH6HarjgQKBgQDxB3g6NhBE9Yw+Fn/yF5NEfHgOPAK92/y6
+589hwVA4ZoYYJUtXrOXpjXaPEfJscsgTdv641xnSMzqlU9zxXEcZ+6m/awLcM9MJ
+yaoXiHOcP4EF7TarccnqC4NyvDgzD945NCzJKwLJwk87NhByCEINNXT/KhRwFXY7
+KK3yiIAe8QKBgCeZecBj2Ksoor8PWdjxit+B9/rX3TtkwMihdpF4Rz3lrElirbRk
+N+OAWSmPRTThTWaqft+AJD0HxRlgeqogPknt7OfS/0Ig+jr95+BkdHFGw2FJndml
+QbZs5YUR9vZY1NTJLioLfbxWo7DG5AjYM+P0Hof4YQtO8IytsWNQ9MkBAoGAXu01
+MZ/nSnF2uWE9JMiaLIfk9J436jSA1c/EQljTUlM2jr3pbW9f4Vrgjbpgwst19wyP
+h5bXyYx5lXFw+/H+4sHV+diYeMdEX394KOqJtcjg9MeXF3CqOC4up/pvG9UtDVR6
+KwRwhausbsJ9OZv8/5zFJlWZVQdu2B/OWk3eP9ECgYEAthwOv0FO+AunoDA5BC3M
+0T6n2jXMDc9QkxzNIswBHwSRkY4UxjdNw+beHKi2Q7pFpaKiZTB/rbHHpqY/HFny
+7nvBVb7NnPpZ3nGqJJc8Hpv/yYqzM0lJLrutxL0pLh4mmU6IIUyeskrahrxpsWhl
+J64r73gl7Oohxuib0X09OZI=
+-----END PRIVATE KEY-----
+```
+K8s Official documentation on How to Create a `CSR Object`:  https://kubernetes.io/docs/tasks/tls/managing-tls-in-a-cluster/#create-a-certificatesigningrequest-object-to-send-to-the-kubernetes-api
+
+```yaml
+# csr_definition_file.yaml
+apiVersion: certificates.k8s.io/v1
+kind: CertificateSigningRequest
+metadata:
+  name: akshay
+spec:
+  request: $(cat akshay.csr | base64 | tr -d '\n') #### You can convert this to base64 manually.
+  signerName: example.com/serving
+  usages:
+  - digital signature
+  - key encipherment
+  - server auth
+```
+
+Refer to the K8s Documentation on the different types of built-in `signerName`: https://kubernetes.io/docs/reference/access-authn-authz/certificate-signing-requests/#signers
+
+```bash
+$ kubectl get csr
+NAME        AGE   SIGNERNAME                                    REQUESTOR                  REQUESTEDDURATION   CONDITION
+akshay      16s   kubernetes.io/kube-apiserver-client           kubernetes-admin           <none>              Pending
+csr-sklv6   25m   kubernetes.io/kube-apiserver-client-kubelet   system:node:controlplane   <none>              Approved,Issued
+
+$ kubectl certificate approve akshay
+certificatesigningrequest.certificates.k8s.io/akshay approved
+
+kubectl get csr
+NAME        AGE     SIGNERNAME                                    REQUESTOR                  REQUESTEDDURATION   CONDITION
+akshay      4m15s   kubernetes.io/kube-apiserver-client           kubernetes-admin           <none>              Approved,Failed
+csr-sklv6   29m     kubernetes.io/kube-apiserver-client-kubelet   system:node:controlplane   <none>              Approved,Issued
+
+kubectl certificate deny agent-smith
+certificatesigningrequest.certificates.k8s.io/agent-smith denied
+
+kubectl get csr
+NAME          AGE     SIGNERNAME                                    REQUESTOR                  REQUESTEDDURATION   CONDITION
+agent-smith   2m51s   kubernetes.io/kube-apiserver-client           agent-x                    <none>              Denied
+akshay        8m13s   kubernetes.io/kube-apiserver-client           kubernetes-admin           <none>              Approved,Failed
+csr-sklv6     33m     kubernetes.io/kube-apiserver-client-kubelet   system:node:controlplane   <none>              Approved,Issued
+
+kubectl delete csr agent-smith 
+certificatesigningrequest.certificates.k8s.io "agent-smith" deleted
+```
+
+This is the super important command that can give you all the commands that you are looking for:
+
+```bash
+# searching the man pages using the `keyword` search "-k"
+$ man -k kubectl
+
+kubectl(1)               - kubectl controls the Kubernetes cluster manager
+kubectl-alpha(1), kubectl alpha(1) - Commands for features in alpha
+kubectl-annotate(1), kubectl annotate(1) - Update the annotations on a resource
+kubectl-api-resources(1), kubectl api-resources(1) - Print the supported API resources on the server
+kubectl-api-versions(1), kubectl api-versions(1) - Print the supported API versions on the server, in the form of "group/version"
+kubectl-apply(1), kubectl apply(1) - Apply a configuration to a resource by file name or stdin
+kubectl-apply-edit-last-applied(1), kubectl apply edit-last-applied(1) - Edit latest last-applied-configuration annotations of a resource/object
+kubectl-apply-set-last-applied(1), kubectl apply set-last-applied(1) - Set the last-applied-configuration annotation on a live object to match the contents of a file
+kubectl-apply-view-last-applied(1), kubectl apply view-last-applied(1) - View the latest last-applied-configuration annotations of a resource/object
+kubectl-attach(1), kubectl attach(1) - Attach to a running container
+kubectl-auth(1), kubectl auth(1) - Inspect authorization
+kubectl-auth-can-i(1), kubectl auth can-i(1) - Check whether an action is allowed
+... 
+...
+... more
+```
+------
+
+### KubeConfig
+
+```bash
+$ kubectl config view
+```
+
+```yaml
+# kube config definition file:
+$ cat my-kube-config 
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority: /etc/kubernetes/pki/ca.crt
+    server: https://controlplane:6443
+  name: development
+- cluster:
+    certificate-authority: /etc/kubernetes/pki/ca.crt
+    server: https://controlplane:6443
+  name: kubernetes-on-aws
+- cluster:
+    certificate-authority: /etc/kubernetes/pki/ca.crt
+    server: https://controlplane:6443
+  name: production
+- cluster:
+    certificate-authority: /etc/kubernetes/pki/ca.crt
+    server: https://controlplane:6443
+  name: test-cluster-1
+contexts:
+- context:
+    cluster: kubernetes-on-aws
+    user: aws-user
+  name: aws-user@kubernetes-on-aws
+- context:
+    cluster: test-cluster-1
+    user: dev-user
+  name: research
+- context:
+    cluster: development
+    user: test-user
+  name: test-user@development
+- context:
+    cluster: production
+    user: test-user
+  name: test-user@production
+current-context: research
+kind: Config
+preferences: {}
+users:
+- name: aws-user
+  user:
+    client-certificate: /etc/kubernetes/pki/users/aws-user/aws-user.crt
+    client-key: /etc/kubernetes/pki/users/aws-user/aws-user.key
+- name: dev-user
+  user:
+    client-certificate: /etc/kubernetes/pki/users/dev-user/developer-user.crt
+    client-key: /etc/kubernetes/pki/users/dev-user/dev-user.key
+- name: test-user
+  user:
+    client-certificate: /etc/kubernetes/pki/users/test-user/test-user.crt
+    client-key: /etc/kubernetes/pki/users/test-user/test-user.key
+```
+
+-----
+
+### API apiGroups
+
+There are multiple API Groups like:
+
+```
+/metrics
+/version
+/api
+/apis
+/healthz
+/logs
+```
+
+Under these groups, they are categorized into two categories `core` and `named`:
+
+```
+/api - core group (Now, it's called as Legacy)
+/apis - named group
+```
+
+Check this [official K8s documentation](https://kubernetes.io/docs/reference/using-api/#:~:text=API%20groups,API%20reference.)
+
+Access the `kube-api` Server:
+
+```bash
+$ curl http://localhost:6443 -k
+```
+
+```bash
+curl http://localhost:6443/apis -k | grep "name"
+```
+
+If you would like to access the api like the above, you would need to pass the `admin.crt` and `admin.key` and `ca.crt` file.
+
+And, as an alternate options to run a `kubectl proxy` using the `port 8001`
+
+```bash
+curl http://localhost:8001 -k
+```
+
+Please note, `kube proxy` and the `kubectl proxy` are NOT the same whereas, the `kubectl proxy` is a HTTP-Server created by the `kubectl` utility to reach the `kube-apiserver`.
+
+----
+
+### Authorization
+
