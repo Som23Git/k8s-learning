@@ -5586,3 +5586,105 @@ yes
 $ kubectl auth can-i delete pods --as dev-user
 yes
 ```
+
+-----
+
+### Cluster Roles
+
+![namespace_and_cluster_scoped_resource](namespace_and_cluster_scoped_resource.png)
+
+```bash
+$ kubectl api-resources --namespaced=true
+$ kubectl api-resources --namespaced=false
+```
+
+Cluster admin
+Storage Admin
+
+```yaml
+$ cat michelle-bindings.yaml 
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: node-admin-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: node-admin
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: michelle
+```
+
+```yaml
+$ cat michelle-clusterrole.yaml 
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: node-admin
+rules:
+- apiGroups:
+  - '*'
+  resources:
+  - 'nodes'
+  verbs:
+  - '*'
+- nonResourceURLs:
+  - '*'
+  verbs:
+  - '*'
+```
+```bash
+$ kubectl apply -f michelle-clusterrole.yaml 
+clusterrole.rbac.authorization.k8s.io/node-admin created
+
+$ kubectl apply -f michelle-bindings.yaml 
+clusterrolebinding.rbac.authorization.k8s.io/node-admin-rolebinding created
+```
+```bash
+$ kubectl api-resources | grep -e "volumes"
+persistentvolumes                   pv           v1                                false        PersistentVolume
+
+$ kubectl api-resources | grep -e "storage"
+csidrivers                                       storage.k8s.io/v1                 false        CSIDriver
+csinodes                                         storage.k8s.io/v1                 false        CSINode
+csistoragecapacities                             storage.k8s.io/v1                 true         CSIStorageCapacity
+storageclasses                      sc           storage.k8s.io/v1                 false        StorageClass
+volumeattachments                                storage.k8s.io/v1                 false        VolumeAttachment
+
+$ kubectl apply -f storage-role.yaml 
+clusterrole.rbac.authorization.k8s.io/storage-admin created
+
+$ kubectl apply -f bindings-storage.yaml 
+clusterrolebinding.rbac.authorization.k8s.io/michelle-storage-admin created
+
+$ cat storage-role.yaml 
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: storage-admin
+rules:
+- apiGroups: ["storage.k8s.io/v1","v1"]
+  resources: ["persistentvolumes","storageclasses"]
+  verbs:
+  - '*'
+- nonResourceURLs:
+  - '*'
+  verbs:
+  - '*'
+
+$ cat bindings-storage.yaml 
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: michelle-storage-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: storage-admin
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: michelle
+```
