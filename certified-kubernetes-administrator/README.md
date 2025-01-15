@@ -5239,7 +5239,7 @@ users:
 
 There are multiple API Groups like:
 
-```
+```bash
 /metrics
 /version
 /api
@@ -5250,7 +5250,7 @@ There are multiple API Groups like:
 
 Under these groups, they are categorized into two categories `core` and `named`:
 
-```
+```bash
 /api - core group (Now, it's called as Legacy)
 /apis - named group
 ```
@@ -5281,3 +5281,410 @@ Please note, `kube proxy` and the `kubectl proxy` are NOT the same whereas, the 
 
 ### Authorization
 
+What is Authorization?
+
+You have got access to the K8s cluster now, but what about the privileges? i.e. Based on the Authentication, you logged in. Now, what are the operations that you can perform on the cluster? This is what, meant as `Authorization`.
+You can restrict users to specific resource or actions so that they don't modify or take control of the resource as whole.
+
+There are different types of Authorization:
+
+- Node Based Authorization
+- ABAC - Attributes based access control
+- RBAC - Role based access control (Recommended)
+- Webhook - Using external Policy agents to regulate the privileges
+
+>[!Important]
+> Please note, you will need to provide the `authorization mode` in the `kube-apiserver` settings so that you'll instruct what to follow to the `kube-apiserver` when there is a request coming in. In the below snippet, where we notice `--authorization-mode=Node,RBAC` so, `Node` based authorization comes first and then, `RBAC`. Once the `kube-apiserver` gets the request, it will check the `Node` Role and its access controls, if it is restricted, then it will go to `RBAC` based access controls. So, it goes in order.
+
+```yaml
+# kube-apiserver.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    component: kube-apiserver
+    tier: control-plane
+  name: kube-apiserver-controlplane
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+    - --advertise-address=192.168.163.5
+    - --allow-privileged=true
+    - --authorization-mode=Node,RBAC      # Setting the `Authorization Mode`
+    - --client-ca-file=/etc/kubernetes/pki/ca.crt
+    - --enable-admission-plugins=NodeRestriction
+    - --enable-bootstrap-token-auth=true
+    - --etcd-cafile=/etc/kubernetes/pki/etcd/ca.crt
+    ...
+    ...
+    image: registry.k8s.io/kube-apiserver:v1.31.0
+    imagePullPolicy: IfNotPresent
+...
+...
+```
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Kube-ApiServer
+    participant Node
+    participant RBAC
+    participant Resource
+
+    %% Authorization
+    Note over User,Resource: Authorization
+    User->>Kube-ApiServer: Initiates an Authorization request to a resource(s)
+    Kube-ApiServer->>Node: Checks whether the User got privileges to access the resource(s)
+    Node -->> Kube-ApiServer: No access provided
+    Kube-ApiServer->>RBAC: Checks whether the User got access here
+    RBAC -->> Kube-ApiServer: No access provided
+    RBAC -->> Kube-ApiServer: If yes, then authorized
+    Kube-ApiServer -->> User: You're authorized
+    User->> Resource: Access provided can perform (kubectl get pods)
+```
+----
+
+##### RBAC - Role based access control
+
+How do we create a role? again, using an object:
+
+Let's check its requirements:
+
+User: Developers
+Operations:
+- Can view pods
+- Can create pods
+- Can delete pods
+- Can create configmaps
+
+```yaml
+# developer-role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: 
+  name: developer
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["list","get","create","update","delete"]
+- apiGroups: [""]
+  resources: ["ConfigMap"]
+  verbs: ["create"]
+```
+
+```bash
+$ kubectl apply -f developer-role.yaml
+```
+
+Now, the role is created successfully, but we need to associate the `users` i.e. `developers` in this scenario to the `role`.
+
+###### Bonus Tip:
+
+Say, you wanted to give access to a specific pod for a Role instead of all the pods. For example, let's consider there are 5 pods - `blue, green, pink, orange, yellow`, let's try to give access only to `blue` and `green` pod.
+
+```yaml
+# developer-role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: 
+  name: developer
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["list","get","create","update","delete"]
+  resourceNames: ["blue","green"]
+```
+
+###### Let's perform Role Binding
+
+```yaml
+# devuser-developer-binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: devuser-developer-binding
+subjects:
+- kind: User
+  name: dev-user
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: developer
+  apiGroup: rbac.authorization.k8s.io
+```
+
+An example from the [K8s official documentation](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#rolebinding-example) on `RoleBinding`:
+
+```yaml
+# role-binding-example.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+# This role binding allows "jane" to read pods in the "default" namespace.
+# You need to already have a Role named "pod-reader" in that namespace.
+kind: RoleBinding
+metadata:
+  name: read-pods
+  namespace: default  # Namespace restriction
+subjects:
+# You can specify more than one "subject"
+- kind: User
+  name: jane # "name" is case sensitive
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  # "roleRef" specifies the binding to a Role / ClusterRole
+  kind: Role #this must be Role or ClusterRole
+  name: pod-reader # this must match the name of the Role or ClusterRole you wish to bind to
+  apiGroup: rbac.authorization.k8s.io
+```
+```bash
+$ kubectl apply -f devuser-developer-binding.yaml
+```
+
+###### Commands that will be useful post Role and RoleBinding creation
+
+```bash
+$ kubectl get roles
+$ kubectl get rolebindings
+$ kubectl describe role dev-user
+$ kubectl describe rolebinding dev-developer-binding
+```
+As a `user` how can you check access for a specific operation:
+
+```bash
+$ kubectl auth can-i create deployments
+$ kubectl auth can-i delete nodes
+$ kubectl auth can-i create deployments --as dev-user
+$ kubectl auth can-i create pods --as dev-user
+$ kubectl auth can-i create pods --as dev-user --namespace test
+```
+```bash
+# Usage examples:
+
+$ kubectl get roles -A
+NAMESPACE     NAME                                             CREATED AT
+blue          developer                                        2025-01-15T00:16:17Z
+kube-public   kubeadm:bootstrap-signer-clusterinfo             2025-01-15T00:10:55Z
+kube-public   system:controller:bootstrap-signer               2025-01-15T00:10:53Z
+kube-system   extension-apiserver-authentication-reader        2025-01-15T00:10:53Z
+kube-system   kube-proxy                                       2025-01-15T00:10:56Z
+kube-system   kubeadm:kubelet-config                           2025-01-15T00:10:53Z
+kube-system   kubeadm:nodes-kubeadm-config                     2025-01-15T00:10:53Z
+kube-system   system::leader-locking-kube-controller-manager   2025-01-15T00:10:53Z
+kube-system   system::leader-locking-kube-scheduler            2025-01-15T00:10:53Z
+kube-system   system:controller:bootstrap-signer               2025-01-15T00:10:53Z
+kube-system   system:controller:cloud-provider                 2025-01-15T00:10:53Z
+kube-system   system:controller:token-cleaner                  2025-01-15T00:10:53Z
+
+$ kubectl describe role kube-proxy -n kube-system
+Name:         kube-proxy
+Labels:       <none>
+Annotations:  <none>
+PolicyRule:
+  Resources   Non-Resource URLs  Resource Names  Verbs
+  ---------   -----------------  --------------  -----
+  configmaps  []                 [kube-proxy]    [get]
+
+$ kubectl get role kube-proxy -n kube-system -o yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  creationTimestamp: "2025-01-15T00:10:56Z"
+  name: kube-proxy
+  namespace: kube-system
+  resourceVersion: "232"
+  uid: 1b5d32f3-3a02-497c-8a1e-d2b9745e1819
+rules:
+- apiGroups:
+  - ""
+  resourceNames:
+  - kube-proxy
+  resources:
+  - configmaps
+  verbs:
+  - get
+
+$ kubectl get rolebindings -o wide -n kube-system
+NAME                                                ROLE                                                  AGE   USERS                                                   GROUPS                                                          SERVICEACCOUNTS
+kube-proxy                                          Role/kube-proxy                                       31m                                                           system:bootstrappers:kubeadm:default-node-token                 
+kubeadm:kubelet-config                              Role/kubeadm:kubelet-config                           31m                                                           system:nodes, system:bootstrappers:kubeadm:default-node-token   
+kubeadm:nodes-kubeadm-config                        Role/kubeadm:nodes-kubeadm-config                     31m                                                           system:bootstrappers:kubeadm:default-node-token, system:nodes   
+system::extension-apiserver-authentication-reader   Role/extension-apiserver-authentication-reader        31m   system:kube-controller-manager, system:kube-scheduler                                                                   
+system::leader-locking-kube-controller-manager      Role/system::leader-locking-kube-controller-manager   31m   system:kube-controller-manager                                                                                          kube-system/kube-controller-manager, kube-system/leader-election-controller
+system::leader-locking-kube-scheduler               Role/system::leader-locking-kube-scheduler            31m   system:kube-scheduler                                                                                                   kube-system/kube-scheduler
+system:controller:bootstrap-signer                  Role/system:controller:bootstrap-signer               31m                                                                                                                           kube-system/bootstrap-signer
+system:controller:cloud-provider                    Role/system:controller:cloud-provider                 31m                                                                                                                           kube-system/cloud-provider
+system:controller:token-cleaner                     Role/system:controller:token-cleaner                  31m                                                                                                                           kube-system/token-cleaner
+
+$ kubectl describe rolebindings kube-proxy -n kube-system
+Name:         kube-proxy
+Labels:       <none>
+Annotations:  <none>
+Role:
+  Kind:  Role
+  Name:  kube-proxy
+Subjects:
+  Kind   Name                                             Namespace
+  ----   ----                                             ---------
+  Group  system:bootstrappers:kubeadm:default-node-token  
+
+$ kubectl auth can-i get pods --as dev-user
+no
+
+$ vi dev-user-role.yaml
+
+$ cat dev-user-role.yaml 
+apiVersion: rbac.authorization.k8s.io/v1 
+kind: Role
+metadata: 
+  name: developer
+  namespace: default
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["list","create","delete"]
+
+$ vi dev-user-role-binding.yaml
+
+$ cat dev-user-role-binding.yaml 
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dev-user-binding
+subjects:
+- kind: User
+  name: dev-user
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: developer
+  apiGroup: rbac.authorization.k8s.io
+
+$ kubectl apply -f dev-user-role.yaml 
+role.rbac.authorization.k8s.io/developer created
+
+$ kubectl apply -f dev-user-role-binding.yaml 
+rolebinding.rbac.authorization.k8s.io/dev-user-binding created
+
+$ kubectl get roles
+NAME        CREATED AT
+developer   2025-01-15T00:58:37Z
+
+$ kubectl get rolebindings
+NAME               ROLE             AGE
+dev-user-binding   Role/developer   15s
+
+$ kubectl auth can-i get pods --as dev-user
+no
+
+$ kubectl auth can-i create pods --as dev-user
+yes
+
+$ kubectl auth can-i list pods --as dev-user
+yes
+
+$ kubectl auth can-i delete pods --as dev-user
+yes
+```
+
+-----
+
+### Cluster Roles
+
+![namespace_and_cluster_scoped_resource](namespace_and_cluster_scoped_resource.png)
+
+```bash
+$ kubectl api-resources --namespaced=true
+$ kubectl api-resources --namespaced=false
+```
+
+Cluster admin
+Storage Admin
+
+```yaml
+$ cat michelle-bindings.yaml 
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: node-admin-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: node-admin
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: michelle
+```
+
+```yaml
+$ cat michelle-clusterrole.yaml 
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: node-admin
+rules:
+- apiGroups:
+  - '*'
+  resources:
+  - 'nodes'
+  verbs:
+  - '*'
+- nonResourceURLs:
+  - '*'
+  verbs:
+  - '*'
+```
+```bash
+$ kubectl apply -f michelle-clusterrole.yaml 
+clusterrole.rbac.authorization.k8s.io/node-admin created
+
+$ kubectl apply -f michelle-bindings.yaml 
+clusterrolebinding.rbac.authorization.k8s.io/node-admin-rolebinding created
+```
+```bash
+$ kubectl api-resources | grep -e "volumes"
+persistentvolumes                   pv           v1                                false        PersistentVolume
+
+$ kubectl api-resources | grep -e "storage"
+csidrivers                                       storage.k8s.io/v1                 false        CSIDriver
+csinodes                                         storage.k8s.io/v1                 false        CSINode
+csistoragecapacities                             storage.k8s.io/v1                 true         CSIStorageCapacity
+storageclasses                      sc           storage.k8s.io/v1                 false        StorageClass
+volumeattachments                                storage.k8s.io/v1                 false        VolumeAttachment
+
+$ kubectl apply -f storage-role.yaml 
+clusterrole.rbac.authorization.k8s.io/storage-admin created
+
+$ kubectl apply -f bindings-storage.yaml 
+clusterrolebinding.rbac.authorization.k8s.io/michelle-storage-admin created
+
+$ cat storage-role.yaml 
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: storage-admin
+rules:
+- apiGroups: ["storage.k8s.io/v1","v1"]
+  resources: ["persistentvolumes","storageclasses"]
+  verbs:
+  - '*'
+- nonResourceURLs:
+  - '*'
+  verbs:
+  - '*'
+
+$ cat bindings-storage.yaml 
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: michelle-storage-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: storage-admin
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: michelle
+```
