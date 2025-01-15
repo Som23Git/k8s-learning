@@ -5325,6 +5325,25 @@ spec:
 ...
 ```
 
+```mermaid
+sequenceDiagram
+    participant User
+    participant Kube-ApiServer
+    participant Node
+    participant RBAC
+    participant Resource
+
+    %% Authorization
+    Note over User,Resource: Authorization
+    User->>Kube-ApiServer: Initiates an Authorization request to a resource(s)
+    Kube-ApiServer->>Node: Checks whether the User got privileges to access the resource(s)
+    Node -->> Kube-ApiServer: No access provided
+    Kube-ApiServer->>RBAC: Checks whether the User got access here
+    RBAC -->> Kube-ApiServer: No access provided
+    RBAC -->> Kube-ApiServer: If yes, then authorized
+    Kube-ApiServer -->> User: You're authorized
+    User->> Resource: Access provided can perform (kubectl get pods)
+```
 ----
 
 ##### RBAC - Role based access control
@@ -5439,5 +5458,131 @@ $ kubectl auth can-i create deployments --as dev-user
 $ kubectl auth can-i create pods --as dev-user
 $ kubectl auth can-i create pods --as dev-user --namespace test
 ```
+```bash
+# Usage examples:
 
+$ kubectl get roles -A
+NAMESPACE     NAME                                             CREATED AT
+blue          developer                                        2025-01-15T00:16:17Z
+kube-public   kubeadm:bootstrap-signer-clusterinfo             2025-01-15T00:10:55Z
+kube-public   system:controller:bootstrap-signer               2025-01-15T00:10:53Z
+kube-system   extension-apiserver-authentication-reader        2025-01-15T00:10:53Z
+kube-system   kube-proxy                                       2025-01-15T00:10:56Z
+kube-system   kubeadm:kubelet-config                           2025-01-15T00:10:53Z
+kube-system   kubeadm:nodes-kubeadm-config                     2025-01-15T00:10:53Z
+kube-system   system::leader-locking-kube-controller-manager   2025-01-15T00:10:53Z
+kube-system   system::leader-locking-kube-scheduler            2025-01-15T00:10:53Z
+kube-system   system:controller:bootstrap-signer               2025-01-15T00:10:53Z
+kube-system   system:controller:cloud-provider                 2025-01-15T00:10:53Z
+kube-system   system:controller:token-cleaner                  2025-01-15T00:10:53Z
 
+$ kubectl describe role kube-proxy -n kube-system
+Name:         kube-proxy
+Labels:       <none>
+Annotations:  <none>
+PolicyRule:
+  Resources   Non-Resource URLs  Resource Names  Verbs
+  ---------   -----------------  --------------  -----
+  configmaps  []                 [kube-proxy]    [get]
+
+$ kubectl get role kube-proxy -n kube-system -o yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  creationTimestamp: "2025-01-15T00:10:56Z"
+  name: kube-proxy
+  namespace: kube-system
+  resourceVersion: "232"
+  uid: 1b5d32f3-3a02-497c-8a1e-d2b9745e1819
+rules:
+- apiGroups:
+  - ""
+  resourceNames:
+  - kube-proxy
+  resources:
+  - configmaps
+  verbs:
+  - get
+
+$ kubectl get rolebindings -o wide -n kube-system
+NAME                                                ROLE                                                  AGE   USERS                                                   GROUPS                                                          SERVICEACCOUNTS
+kube-proxy                                          Role/kube-proxy                                       31m                                                           system:bootstrappers:kubeadm:default-node-token                 
+kubeadm:kubelet-config                              Role/kubeadm:kubelet-config                           31m                                                           system:nodes, system:bootstrappers:kubeadm:default-node-token   
+kubeadm:nodes-kubeadm-config                        Role/kubeadm:nodes-kubeadm-config                     31m                                                           system:bootstrappers:kubeadm:default-node-token, system:nodes   
+system::extension-apiserver-authentication-reader   Role/extension-apiserver-authentication-reader        31m   system:kube-controller-manager, system:kube-scheduler                                                                   
+system::leader-locking-kube-controller-manager      Role/system::leader-locking-kube-controller-manager   31m   system:kube-controller-manager                                                                                          kube-system/kube-controller-manager, kube-system/leader-election-controller
+system::leader-locking-kube-scheduler               Role/system::leader-locking-kube-scheduler            31m   system:kube-scheduler                                                                                                   kube-system/kube-scheduler
+system:controller:bootstrap-signer                  Role/system:controller:bootstrap-signer               31m                                                                                                                           kube-system/bootstrap-signer
+system:controller:cloud-provider                    Role/system:controller:cloud-provider                 31m                                                                                                                           kube-system/cloud-provider
+system:controller:token-cleaner                     Role/system:controller:token-cleaner                  31m                                                                                                                           kube-system/token-cleaner
+
+$ kubectl describe rolebindings kube-proxy -n kube-system
+Name:         kube-proxy
+Labels:       <none>
+Annotations:  <none>
+Role:
+  Kind:  Role
+  Name:  kube-proxy
+Subjects:
+  Kind   Name                                             Namespace
+  ----   ----                                             ---------
+  Group  system:bootstrappers:kubeadm:default-node-token  
+
+$ kubectl auth can-i get pods --as dev-user
+no
+
+$ vi dev-user-role.yaml
+
+$ cat dev-user-role.yaml 
+apiVersion: rbac.authorization.k8s.io/v1 
+kind: Role
+metadata: 
+  name: developer
+  namespace: default
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["list","create","delete"]
+
+$ vi dev-user-role-binding.yaml
+
+$ cat dev-user-role-binding.yaml 
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dev-user-binding
+subjects:
+- kind: User
+  name: dev-user
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: developer
+  apiGroup: rbac.authorization.k8s.io
+
+$ kubectl apply -f dev-user-role.yaml 
+role.rbac.authorization.k8s.io/developer created
+
+$ kubectl apply -f dev-user-role-binding.yaml 
+rolebinding.rbac.authorization.k8s.io/dev-user-binding created
+
+$ kubectl get roles
+NAME        CREATED AT
+developer   2025-01-15T00:58:37Z
+
+$ kubectl get rolebindings
+NAME               ROLE             AGE
+dev-user-binding   Role/developer   15s
+
+$ kubectl auth can-i get pods --as dev-user
+no
+
+$ kubectl auth can-i create pods --as dev-user
+yes
+
+$ kubectl auth can-i list pods --as dev-user
+yes
+
+$ kubectl auth can-i delete pods --as dev-user
+yes
+```
