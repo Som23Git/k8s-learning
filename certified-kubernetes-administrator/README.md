@@ -5239,7 +5239,7 @@ users:
 
 There are multiple API Groups like:
 
-```
+```bash
 /metrics
 /version
 /api
@@ -5250,7 +5250,7 @@ There are multiple API Groups like:
 
 Under these groups, they are categorized into two categories `core` and `named`:
 
-```
+```bash
 /api - core group (Now, it's called as Legacy)
 /apis - named group
 ```
@@ -5280,4 +5280,164 @@ Please note, `kube proxy` and the `kubectl proxy` are NOT the same whereas, the 
 ----
 
 ### Authorization
+
+What is Authorization?
+
+You have got access to the K8s cluster now, but what about the privileges? i.e. Based on the Authentication, you logged in. Now, what are the operations that you can perform on the cluster? This is what, meant as `Authorization`.
+You can restrict users to specific resource or actions so that they don't modify or take control of the resource as whole.
+
+There are different types of Authorization:
+
+- Node Based Authorization
+- ABAC - Attributes based access control
+- RBAC - Role based access control (Recommended)
+- Webhook - Using external Policy agents to regulate the privileges
+
+>[!Important]
+> Please note, you will need to provide the `authorization mode` in the `kube-apiserver` settings so that you'll instruct what to follow to the `kube-apiserver` when there is a request coming in. In the below snippet, where we notice `--authorization-mode=Node,RBAC` so, `Node` based authorization comes first and then, `RBAC`. Once the `kube-apiserver` gets the request, it will check the `Node` Role and its access controls, if it is restricted, then it will go to `RBAC` based access controls. So, it goes in order.
+
+```yaml
+# kube-apiserver.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    component: kube-apiserver
+    tier: control-plane
+  name: kube-apiserver-controlplane
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+    - --advertise-address=192.168.163.5
+    - --allow-privileged=true
+    - --authorization-mode=Node,RBAC      # Setting the `Authorization Mode`
+    - --client-ca-file=/etc/kubernetes/pki/ca.crt
+    - --enable-admission-plugins=NodeRestriction
+    - --enable-bootstrap-token-auth=true
+    - --etcd-cafile=/etc/kubernetes/pki/etcd/ca.crt
+    ...
+    ...
+    image: registry.k8s.io/kube-apiserver:v1.31.0
+    imagePullPolicy: IfNotPresent
+...
+...
+```
+
+----
+
+##### RBAC - Role based access control
+
+How do we create a role? again, using an object:
+
+Let's check its requirements:
+
+User: Developers
+Operations:
+- Can view pods
+- Can create pods
+- Can delete pods
+- Can create configmaps
+
+```yaml
+# developer-role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: 
+  name: developer
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["list","get","create","update","delete"]
+- apiGroups: [""]
+  resources: ["ConfigMap"]
+  verbs: ["create"]
+```
+
+```bash
+$ kubectl apply -f developer-role.yaml
+```
+
+Now, the role is created successfully, but we need to associate the `users` i.e. `developers` in this scenario to the `role`.
+
+###### Bonus Tip:
+
+Say, you wanted to give access to a specific pod for a Role instead of all the pods. For example, let's consider there are 5 pods - `blue, green, pink, orange, yellow`, let's try to give access only to `blue` and `green` pod.
+
+```yaml
+# developer-role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: 
+  name: developer
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["list","get","create","update","delete"]
+  resourceNames: ["blue","green"]
+```
+
+###### Let's perform Role Binding
+
+```yaml
+# devuser-developer-binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: devuser-developer-binding
+subjects:
+- kind: User
+  name: dev-user
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: developer
+  apiGroup: rbac.authorization.k8s.io
+```
+
+An example from the [K8s official documentation](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#rolebinding-example) on `RoleBinding`:
+
+```yaml
+# role-binding-example.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+# This role binding allows "jane" to read pods in the "default" namespace.
+# You need to already have a Role named "pod-reader" in that namespace.
+kind: RoleBinding
+metadata:
+  name: read-pods
+  namespace: default  # Namespace restriction
+subjects:
+# You can specify more than one "subject"
+- kind: User
+  name: jane # "name" is case sensitive
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  # "roleRef" specifies the binding to a Role / ClusterRole
+  kind: Role #this must be Role or ClusterRole
+  name: pod-reader # this must match the name of the Role or ClusterRole you wish to bind to
+  apiGroup: rbac.authorization.k8s.io
+```
+```bash
+$ kubectl apply -f devuser-developer-binding.yaml
+```
+
+###### Commands that will be useful post Role and RoleBinding creation
+
+```bash
+$ kubectl get roles
+$ kubectl get rolebindings
+$ kubectl describe role dev-user
+$ kubectl describe rolebinding dev-developer-binding
+```
+As a `user` how can you check access for a specific operation:
+
+```bash
+$ kubectl auth can-i create deployments
+$ kubectl auth can-i delete nodes
+$ kubectl auth can-i create deployments --as dev-user
+$ kubectl auth can-i create pods --as dev-user
+$ kubectl auth can-i create pods --as dev-user --namespace test
+```
+
 
