@@ -5716,3 +5716,45 @@ subjects:
 $ kubectl apply -f bindings-storage.yaml 
 clusterrolebinding.rbac.authorization.k8s.io/michelle-storage-admin created
 ```
+
+### Service Accounts
+
+![service_account_correlation_with_ckad](service_account_correlation_with_ckad.png)
+
+There is some correlation with the CKA and CKAD with respect to Security.
+
+`User accounts` are used by us i.e. humans.
+`Service Accounts` are used by Machines i.e. bots like `Prometheus` to collect metrics and `Jenkins`.
+
+How do this Service Account works?
+
+Whenever, we create a serviceaccount, let's call it - `dashboard-sa`, it will create a `service account object` and then, generates a token for the `service account object - dashboard-sa`. Post creating a token, it creates a `secret` associating the token generated. Finally, this `secret` gets associated to the `service account object - dashboard-sa`. 
+
+We can always check this `secret token` that is generated and pass it via the `REST API` bearer token. 
+
+```bash
+curl https://192.168.56.20:6443/api --insecure --header "Authorization: Bearer <token_generated_or_used_in_secrets"
+```
+
+##### Commands used in the Service Account
+
+```bash
+$ kubectl create serviceaccount <account-name>
+
+$ kubectl get serviceaccount
+
+$ kubectl describe serviceaccount <account-name>
+```
+
+1.22/1.24 
+
+References:
+
+KEP 1205 - Bound Service Account Tokens
+https://github.com/kubernetes/enhancements/tree/master/keps/sig-auth/1205-bound-service-account-tokens
+
+KEP-2799: Reduction of Secret-based Service Account Tokens
+https://github.com/kubernetes/enhancements/tree/master/keps/sig-auth/2799-reduction-of-secret-based-service-account-token
+https://kubernetes.io/docs/concepts/configuration/secret/#service-account-token-secrets
+https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/
+
