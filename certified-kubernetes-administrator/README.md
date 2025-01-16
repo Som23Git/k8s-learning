@@ -5597,27 +5597,15 @@ yes
 $ kubectl api-resources --namespaced=true
 $ kubectl api-resources --namespaced=false
 ```
+Here's a scenario:
 
-Cluster admin
-Storage Admin
+A new user `michelle` joined the team. She will be focusing on the `nodes` in the cluster. Create the required `ClusterRoles` and `ClusterRoleBindings` so she gets access to the nodes.
 
-```yaml
-$ cat michelle-bindings.yaml 
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: node-admin-rolebinding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: node-admin
-subjects:
-- apiGroup: rbac.authorization.k8s.io
-  kind: User
-  name: michelle
-```
+```bash
+# Creating a cluster role
 
-```yaml
+$ kubectl create clusterrole node-admin --verb=get,list,watch --resource=nodes
+or
 $ cat michelle-clusterrole.yaml 
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -5634,15 +5622,47 @@ rules:
   - '*'
   verbs:
   - '*'
-```
-```bash
+
 $ kubectl apply -f michelle-clusterrole.yaml 
 clusterrole.rbac.authorization.k8s.io/node-admin created
+
+# Creating a cluster-role-bindings
+
+$ kubectl create clusterrolebinding node-admin-clusterrolebinding --clusterrole=node-admin --user=michelle
+or
+$ cat michelle-bindings.yaml 
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: node-admin-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: node-admin
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: michelle
 
 $ kubectl apply -f michelle-bindings.yaml 
 clusterrolebinding.rbac.authorization.k8s.io/node-admin-rolebinding created
 ```
+
+michelle's responsibilities are growing and now she will be responsible for storage as well. Create the required `ClusterRoles` and `ClusterRoleBindings` to allow her access to `Storage`.
+
+
+Get the API groups and resource names from command kubectl api-resources. Use the given spec:
+
+Required options:
+- ClusterRole: storage-admin
+- Resource: persistentvolumes
+- Resource: storageclasses
+- ClusterRoleBinding: michelle-storage-admin
+- ClusterRoleBinding Subject: michelle
+- ClusterRoleBinding Role: storage-admin
+
 ```bash
+# Checking API Resources and shorthand
 $ kubectl api-resources | grep -e "volumes"
 persistentvolumes                   pv           v1                                false        PersistentVolume
 
@@ -5653,12 +5673,10 @@ csistoragecapacities                             storage.k8s.io/v1              
 storageclasses                      sc           storage.k8s.io/v1                 false        StorageClass
 volumeattachments                                storage.k8s.io/v1                 false        VolumeAttachment
 
-$ kubectl apply -f storage-role.yaml 
-clusterrole.rbac.authorization.k8s.io/storage-admin created
+# Creating Cluster Role for Storage Admin
 
-$ kubectl apply -f bindings-storage.yaml 
-clusterrolebinding.rbac.authorization.k8s.io/michelle-storage-admin created
-
+$ kubectl create clusterrole storage-admin --verb=* --resource=storageclasses,persistentvolumes
+or
 $ cat storage-role.yaml 
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -5674,6 +5692,13 @@ rules:
   verbs:
   - '*'
 
+$ kubectl apply -f storage-role.yaml 
+clusterrole.rbac.authorization.k8s.io/storage-admin created
+
+# Creating cluster role bindings for the storage admin
+
+$ kubectl create clusterrolebinding michelle-storage-admin --clusterrole=storage-admin --user=michelle
+or
 $ cat bindings-storage.yaml 
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -5687,4 +5712,7 @@ subjects:
 - apiGroup: rbac.authorization.k8s.io
   kind: User
   name: michelle
+
+$ kubectl apply -f bindings-storage.yaml 
+clusterrolebinding.rbac.authorization.k8s.io/michelle-storage-admin created
 ```
