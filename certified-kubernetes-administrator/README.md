@@ -6183,6 +6183,84 @@ We could clearly notice that the image was pulled from the `myprivateregistry.co
 
 ------
 
+### Pre-requisite Security in Docker
+
+
+##### process isolation
+
+Please note,  process `PID` varies between the `host` and the `docker container`. 
+
+Let's say, you run `docker run sleep 3600`, if you notice this within the `docker container` as `ps aux`, you can see the `sleep 3600` as `PID` is `1` and the `user` is `root`.
+
+But, when you run the same `ps aux` in the `host` terminal where the docker is installed, you would still see this `sleep 3600` but, having a different `PID` why because, both of isolated using a concept called `namespace` and `process isolation`.
+
+By default, `host` has a namespace and the `docker` container(s) have a namespace where both does not get overlapped. At firstsight, it might look the same but, it's NOT.
+
+That said, there is an interesting concept called `Linux Capabilities` where, we can extend the capabilities of the user in the docker i.e. `root` similar to the user in the host, also `root`. **Remember, both the `root` user(s) capabilities are different. In short, the `root` user in the docker does not have all capabilities to bypass or update or modify the data in the `host` side. So, we can extend the privileges for the `root` user in the docker container.
+
+##### Linux Capabilities
+
+List of all capabilities, can be observed in the below file:
+
+```bash
+/usr/include/linux/capability.h
+```
+
+Have attached the capability file from a docker container here: [docker_container_capabilities.h.file.txt](certified-kubernetes-administrator/docker_container_capabilities.h.file.txt)
+
+To Extend a `Capability` or use a different user instead of the `root`, you can run:
+
+```bash
+$ docker run --user=1001 ubuntu sleep 3600
+
+$ docker run --cap-add MAC_ADMIN ubuntu sleep 3600
+```
+
+-----
+
+### Security Contexts
+
+Container Security in Kubernetes is same as the Docker container:
+
+In K8s, you have an extra option to tune the `security contexts` i.e. you can spread the capabilities within the `pod` i.e. all containers in the pod will comply to those settings. Also, you can narrow it down to a `container` as well. Or, you can mix both - add `pod` level capabilities as well as the `container` level capabilities, where the `container` level capabilities are taken into consideration instead of the `pod` level capabilities because it has more priority.
+
+```yaml
+# pod-definition-file.v1.yaml
+
+## Adding Pod-Level Security Contexts
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-app
+spec:
+  securityContext:      ## Adding Pod-level security contexts
+    runAsUser: 1000
+  containers:
+  - image: nginx
+    name: nginx-app
+    command: ["sleep","3600"]
+```
+
+```yaml
+# pod-definition-file.v2.yaml
+
+## Adding container-Level Security Contexts and Security Capabilities
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-app
+spec:
+  containers:
+  - image: nginx
+    name: nginx-app
+    command: ["sleep","3600"]
+    securityContext:      ## Adding container-level security contexts
+      runAsUser: 1000
+      capabilities:       ## Adding container-level capabilities
+        add: ["MAC_ADMIN"]
+```
+
+
 
 
 
