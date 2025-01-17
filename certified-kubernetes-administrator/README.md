@@ -6198,6 +6198,34 @@ By default, `host` has a namespace and the `docker` container(s) have a namespac
 
 That said, there is an interesting concept called `Linux Capabilities` where, we can extend the capabilities of the user in the docker i.e. `root` similar to the user in the host, also `root`. **Remember, both the `root` user(s) capabilities are different. In short, the `root` user in the docker does not have all capabilities to bypass or update or modify the data in the `host` side. So, we can extend the privileges for the `root` user in the docker container.
 
+Here is the difference in the processes:
+
+```bash
+# Running in the host where, the command sleep 4800 is executed
+$ ps aux
+PID   USER     TIME  COMMAND
+    1 root      0:00 {kinit.sh} /bin/bash /usr/bin/kinit.sh
+   56 root      1:00 {k3s-server} /usr/bin/k3s server
+  376 root      0:15 containerd 
+ ...
+ ...
+ 8778 root      0:00 /var/lib/rancher/k3s/data/d837e0b203a84cc7bfbb4a3054fc1d95d2b9ad5e460ed34401ff795b9c03118b/bin/containerd-shim
+ 8804 65535     0:00 /pause
+ 8910 root      0:00 sleep 4800        ### Same command but, the PID is different in the host
+ 9608 root      0:00 /usr/bin/script -q -f /root/.terminal_logs/terminal.log bash -c sudo su -
+ 9610 root      0:00 -bash
+ 9958 root      0:00 ps aux
+
+# Running inside the container where, the command sleep 4800 is executed, the user is same but, the PID is different
+$ crictl exec -it 9cc7b88780a0d /bin/sh
+# ps aux
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root           1  0.0  0.0   2696  1064 ?        Ss   13:26   0:00 sleep 4800       ### Same command but, the PID is different in the container
+root          62  0.0  0.0   2800  1088 pts/0    Ss   13:29   0:00 /bin/sh
+root          68  0.0  0.0   7888  4072 pts/0    R+   13:29   0:00 ps aux
+# exit
+ ```
+
 ##### Linux Capabilities
 
 List of all capabilities, can be observed in the below file:
@@ -6260,7 +6288,46 @@ spec:
         add: ["MAC_ADMIN"]
 ```
 
+>[!Important]
+> Please note, the `capabilities` can only be added to the `container` and NOT the `pod` so, it will NOT work if you added the `capabilities` to the pod's security context, it will throw an error.
 
+##### Commands used
+
+```bash
+# Post updating the user to run the `sleep 4800` command:
+
+$ ps aux
+PID   USER     TIME  COMMAND
+    1 root      0:00 {kinit.sh} /bin/bash /usr/bin/kinit.sh
+   56 root      0:40 {k3s-server} /usr/bin/k3s server
+  385 root      0:11 containerd 
+...
+...
+ 7033 root      0:00 /var/lib/rancher/k3s/data/d837e0b203a84cc7bfbb4a3054fc1d95d2b9ad5e460ed34401f
+ 7060 1010      0:00 /pause
+ 7165 1010      0:00 sleep 4800   ### If you see here, it got updated from `root` to user `1010`
+ 7308 root      0:00 ps aux
+
+$ cat multi-pod.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: multi-pod
+spec:
+  securityContext:
+    runAsUser: 1001
+  containers:
+  -  image: ubuntu
+     name: web
+     command: ["sleep", "5000"]
+     securityContext:
+      runAsUser: 1002
+
+  -  image: ubuntu
+     name: sidecar
+     command: ["sleep", "5000"]
+
+```
 
 
 
