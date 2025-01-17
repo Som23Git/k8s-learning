@@ -5744,11 +5744,245 @@ $ kubectl create serviceaccount <account-name>
 $ kubectl get serviceaccount
 
 $ kubectl describe serviceaccount <account-name>
+
+$ kubectl get sa
+NAME      SECRETS   AGE
+default   0         7m45s
+dev       0         71s
+
+$ kubectl get sa default -o yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  creationTimestamp: "2025-01-16T23:44:19Z"
+  name: default
+  namespace: default
+  resourceVersion: "386"
+  uid: c79eb0fb-f88b-4705-a3fc-7c6b92a369f5
+
+$ kubectl describe sa default
+Name:                default
+Namespace:           default
+Labels:              <none>
+Annotations:         <none>
+Image pull secrets:  <none>
+Mountable secrets:   <none>
+Tokens:              <none>   # there is no secret token used by the `default` service account
+Events:              <none>
+
+# Deployed a new application
+$ kubectl get deploy
+NAME            READY   UP-TO-DATE   AVAILABLE   AGE
+web-dashboard   1/1     1            1           44s
+
+$ kubectl get pods
+NAME                             READY   STATUS    RESTARTS   AGE
+web-dashboard-66d58fc7b8-ln9w6   1/1     Running   0          38s
+
+$ kubectl describe pod web-dashboard-66d58fc7b8-ln9w6 
+Name:             web-dashboard-66d58fc7b8-ln9w6
+Namespace:        default
+Priority:         0
+Service Account:  default
+Node:             controlplane/192.168.219.159
+Start Time:       Thu, 16 Jan 2025 23:53:59 +0000
+Labels:           name=web-dashboard
+                  pod-template-hash=66d58fc7b8
+Annotations:      <none>
+Status:           Running
+IP:               10.42.0.9
+IPs:
+  IP:           10.42.0.9
+Controlled By:  ReplicaSet/web-dashboard-66d58fc7b8
+Containers:
+  web-dashboard:
+    Container ID:   containerd://cc73e9f4a69b88a0a2777ce4cce30e1b43057705ddb26496b271cbe577a7649c
+    Image:          gcr.io/kodekloud/customimage/my-kubernetes-dashboard
+    Image ID:       gcr.io/kodekloud/customimage/my-kubernetes-dashboard@sha256:7d70abe342b13ff1c4242dc83271ad73e4eedb04e2be0dd30ae7ac8852193069
+    Port:           8080/TCP
+    Host Port:      0/TCP
+    State:          Running
+      Started:      Thu, 16 Jan 2025 23:54:02 +0000
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      PYTHONUNBUFFERED:  1
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-2hjkz (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-2hjkz:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  35m   default-scheduler  Successfully assigned default/web-dashboard-66d58fc7b8-ln9w6 to controlplane
+  Normal  Pulling    35m   kubelet            Pulling image "gcr.io/kodekloud/customimage/my-kubernetes-dashboard"
+  Normal  Pulled     35m   kubelet            Successfully pulled image "gcr.io/kodekloud/customimage/my-kubernetes-dashboard" in 1.697s (1.697s including waiting). Image size: 31659887 bytes.
+  Normal  Created    35m   kubelet            Created container web-dashboard
+  Normal  Started    35m   kubelet            Started container web-dashboard
+
+$ cat /var/rbac/pod-reader-role.yaml
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: default
+  name: pod-reader
+rules:
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  verbs:
+  - get
+  - watch
+  - list
+
+$ kubectl describe role pod-reader
+Name:         pod-reader
+Labels:       <none>
+Annotations:  <none>
+PolicyRule:
+  Resources  Non-Resource URLs  Resource Names  Verbs
+  ---------  -----------------  --------------  -----
+  pods       []                 []              [get watch list]
+
+$ cat /var/rbac/dashboard-sa-role-binding.yaml 
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: read-pods
+  namespace: default
+subjects:
+- kind: ServiceAccount
+  name: dashboard-sa # Name is case sensitive
+  namespace: default
+roleRef:
+  kind: Role #this must be Role or ClusterRole
+  name: pod-reader # this must match the name of the Role or ClusterRole you wish to bind to
+  apiGroup: rbac.authorization.k8s.io
+
+$ kubectl describe rolebindings read-pods 
+Name:         read-pods
+Labels:       <none>
+Annotations:  <none>
+Role:
+  Kind:  Role
+  Name:  pod-reader
+Subjects:
+  Kind            Name          Namespace
+  ----            ----          ---------
+  ServiceAccount  dashboard-sa  default
+
+# To login or ssh into the container within the pod to check the Service Account Token is available
+
+$ kubectl exec web-dashboard-66d58fc7b8-ln9w6 -c web-dashboard -i -t -- sh
+/opt/webapp-conntest # ls
+Dockerfile        app.py            requirements.txt  templates
+README.md         kube-files        static            venv
+
+$ /run/secrets/kubernetes.io/serviceaccount # ls -ltrh
+total 0      
+lrwxrwxrwx    1 root     root          12 Jan 16 23:54 token -> ..data/token
+lrwxrwxrwx    1 root     root          16 Jan 16 23:54 namespace -> ..data/namespace
+lrwxrwxrwx    1 root     root          13 Jan 16 23:54 ca.crt -> ..data/ca.crt
+
+$ cat token 
+eyJhbGciOiJSUzI1NiIsImtpZCI6Il80WDhnTXZNcjBuUDBnV21ncWVPWm5OSmwzRnZ4VDVyVWNRbnlDSmdCRXGVzLmRlZmF1bHQuc3ZjLmNsdXN0ZXIubG9jYWwiLCJrM3MiXSwiZXhwIjoxNzY4NjA3NjQwLCJpYXQiOjE3MzcXRlcy5kZWZhdWx0LnN2Yy5jbHVzdGVyLmxvY2FsIiwianRpIjoiOWQ2OWUwMTItNjZjOS00ZjNmLWFjODktNDZyJuYW1lc3BhY2UiOiJkZWZhdWx0Iiwibm9kZSI6eyJuYW1lIjoiY29udHJvbHBsYW5lIiwidWlkIjoiM2Y5OTJjYwIn0sInBvZCI6eyJuYW1lIjoid2ViLWRhc2hib2FyZC02NmQ1OGZjN2I4LWxuOXc2IiwidWlkIjoiZDY4OWVTZkIn0sInNlcnZpY2VhY2NvdW50Ijp7Im5hbWUiOiJkZWZhdWx0IiwidWlkIjoiYzc5ZWIwZmItZjg4Yi00NzAnRlciI6MTczNzA3NTI0N30sIm5iZiI6MTczNzA3MTY0MCwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50OmRH_MURWc46j_HC-xzaRcAaQ9XZIufjGocWql21znwBStd2S8nQw7v5ELhNL6Y-pO6lYq8WNlVpOd9qYftrBbbPLQlvFXh5A7qZTgo__ESEFMr_OTRD1oRGt9PR5TFFlrb3Hkwmicgs2uFYcIVhBsHUZGy9tq3MllZ_3YbNsCccjK_
+
+# There is no Service Account specifically associated to the pod or the container, it is using the default service account:
+$ kubectl get deployments.apps web-dashboard -o yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  ...
+  ...
+  name: web-dashboard
+  namespace: default
+  resourceVersion: "870"
+  uid: f6cbf347-705a-4a14-8481-7b915b41f910
+spec:
+...
+  selector:
+    matchLabels:
+      name: web-dashboard
+...
+  template:
+    metadata:
+      labels:
+        name: web-dashboard
+    spec:
+      containers:
+      - env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        image: gcr.io/kodekloud/customimage/my-kubernetes-dashboard
+        imagePullPolicy: Always
+        name: web-dashboard
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+...
+...
+
+# Now, Edit the deployment and add the serviceAccountName: dashboard-sa, let's check the pod now:
+
+$ kubectl get pod/web-dashboard-6f64cd9d8d-bqqhm -o yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: web-dashboard-6f64cd9d8d-
+  labels:
+    name: web-dashboard
+    pod-template-hash: 6f64cd9d8d
+  name: web-dashboard-6f64cd9d8d-bqqhm
+  namespace: default
+...
+spec:
+  containers:
+  - env:
+    - name: PYTHONUNBUFFERED
+      value: "1"
+    image: gcr.io/kodekloud/customimage/my-kubernetes-dashboard
+    imagePullPolicy: Always
+    name: web-dashboard
+    ports:
+    - containerPort: 8080
+      protocol: TCP
+    resources: {}
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-pq2m4
+      readOnly: true
+  serviceAccount: dashboard-sa      # Service Account got added
+  serviceAccountName: dashboard-sa
+...
+...
 ```
 
-1.22/1.24 
+v1.22/1.24 - There is an update to the `Service Account` and `tokenRequest` API methods. And, how it mounted to the pod.
 
-References:
+###### References:
 
 KEP 1205 - Bound Service Account Tokens
 https://github.com/kubernetes/enhancements/tree/master/keps/sig-auth/1205-bound-service-account-tokens
@@ -5757,4 +5991,8 @@ KEP-2799: Reduction of Secret-based Service Account Tokens
 https://github.com/kubernetes/enhancements/tree/master/keps/sig-auth/2799-reduction-of-secret-based-service-account-token
 https://kubernetes.io/docs/concepts/configuration/secret/#service-account-token-secrets
 https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/
+
+----
+
+
 
