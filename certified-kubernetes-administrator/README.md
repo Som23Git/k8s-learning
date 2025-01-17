@@ -6032,6 +6032,15 @@ $ kubectl create secret docker-registry <secret-name> \
 --docker-username=registry-user \
 --docker-password=registry-password \
 --docker-email=registry-user@org.com
+
+# Example:
+
+$ kubectl create secret docker-registry private-reg-cred \
+> --docker-server=myprivateregistry.com:5000 \
+> --docker-username=dock_user \
+> --docker-password=dock_password \
+> --docker-email=dock_user@myprivateregistry.com
+secret/private-reg-cred created
 ```
 
 ```yaml
@@ -6048,6 +6057,129 @@ spec:
   imagePullSecrets:
   - name: <secret-name>
 ```
+
+Here's a Scenario, where there is already a deployment:
+
+```yaml
+$ kubectl get deployments.apps web -o yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: web
+  name: web
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+...
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: web
+    spec:
+      containers:
+      - image: myprivateregistry.com:5000/nginx:alpine    ## Private Registry
+        imagePullPolicy: IfNotPresent
+        name: nginx
+...
+...
+```
+As we have created the secret `private-reg-cred` so, we can edit the deployment and associate it in the containers:
+
+```yaml
+$ kubectl get deployments.apps web -o yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: web
+  name: web
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+...
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      imagePullSecrets:         ## Added the secrets so it can authenticate successfully
+      - name: private-reg-cred
+      containers:
+      - image: myprivateregistry.com:5000/nginx:alpine    ## Private Registry
+        imagePullPolicy: IfNotPresent
+        name: nginx
+...
+...
+```
+Now, post this change the pods are `running` successfully, let's inspect those pods:
+
+```bash
+$ kubectl describe pod web-8569544bdb-m9h2g
+Name:             web-8569544bdb-m9h2g
+Namespace:        default
+Priority:         0
+Service Account:  default
+Node:             controlplane/192.168.121.237
+Start Time:       Fri, 17 Jan 2025 01:31:24 +0000
+Labels:           app=web
+                  pod-template-hash=8569544bdb
+Annotations:      <none>
+Status:           Running
+IP:               10.50.0.6
+IPs:
+  IP:           10.50.0.6
+Controlled By:  ReplicaSet/web-8569544bdb
+Containers:
+  nginx:
+    Container ID:   containerd://48cc41c8e059a020961f940e014bab9d17b1985be50ae3c28ce18de7dd742c31
+    Image:          myprivateregistry.com:5000/nginx:alpine
+    Image ID:       docker.io/library/nginx@sha256:814a8e88df978ade80e584cc5b333144b9372a8e3c98872d07137dbf3b44d0e4
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Fri, 17 Jan 2025 01:31:25 +0000
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-lnfrb (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-lnfrb:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age    From               Message
+  ----    ------     ----   ----               -------
+  Normal  Scheduled  3m49s  default-scheduler  Successfully assigned default/web-8569544bdb-m9h2g to controlplane
+  Normal  Pulling    3m48s  kubelet            Pulling image "myprivateregistry.com:5000/nginx:alpine"
+  Normal  Pulled     3m48s  kubelet            Successfully pulled image "myprivateregistry.com:5000/nginx:alpine" in 119ms (119ms including waiting). Image size: 20534112 bytes.
+  Normal  Created    3m48s  kubelet            Created container nginx
+  Normal  Started    3m48s  kubelet            Started container nginx
+```
+
+We could clearly notice that the image was pulled from the `myprivateregistry.com:5000/nginx:alpine` as you see in the events.
 
 ------
 
