@@ -5994,5 +5994,63 @@ https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/
 
 ----
 
+### Image Security
+
+Securing images, and how to make use of the images from the `private repository` or `secured repository`.
+
+Usually, when we have `image: nginx`, but actually this translates to `image: docker.io/library/nginx`
+So,
+**
+- Registry -> docker.io
+- User/account -> library
+- Image/Repository -> nginx
+**
+
+As the `nginx` is a well-known repository or image, it is aliased as just `nginx`.
+
+Also, for an example of the `private repository` is -> `gcr.io/kubernetes-e2e-test-images/dnsutils`
+Where,
+**
+- Registry -> gcr.io
+- User/account -> kubernetes-e2e-test-images
+- Image/Repository -> dnsutils
+**
+
+In Private Repository, to access the image, we must perform the below steps:
+
+- docker login private-registry.io
+- docker run private-registry.io/apps/internal-app
+
+But, when creating a pod, how do we do the above steps?
+
+
+```bash
+# We should create a secret and attach that secret to the pod
+
+$ kubectl create secret docker-registry <secret-name> \
+--docker-server=private-registry.io \
+--docker-username=registry-user \
+--docker-password=registry-password \
+--docker-email=registry-user@org.com
+```
+
+```yaml
+# pod-definition-file.yaml attached with the private registry
+
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: pod-private-repo
+spec:
+  containers:
+  - name: private-image
+    image: private-registry.io/apps/internal-app
+  imagePullSecrets:
+  - name: <secret-name>
+```
+
+------
+
+
 
 
