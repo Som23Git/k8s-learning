@@ -5346,7 +5346,7 @@ sequenceDiagram
 ```
 ----
 
-##### RBAC - Role based access control
+#### RBAC - Role based access control
 
 How do we create a role? again, using an object:
 
@@ -5380,7 +5380,7 @@ $ kubectl apply -f developer-role.yaml
 
 Now, the role is created successfully, but we need to associate the `users` i.e. `developers` in this scenario to the `role`.
 
-###### Bonus Tip:
+##### Bonus Tip:
 
 Say, you wanted to give access to a specific pod for a Role instead of all the pods. For example, let's consider there are 5 pods - `blue, green, pink, orange, yellow`, let's try to give access only to `blue` and `green` pod.
 
@@ -6329,5 +6329,359 @@ spec:
 
 ```
 
+### Network Policies
+
+#### Traffic
+
+#### Network Security
+
+##### Ingress Policy
+```yaml
+# Ingress Policy
+apiVersion: netowkring.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-policy
+spec:
+  podSelector:
+    matchLabels:
+      role: db
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:              # Rule 1
+        matchLabels:
+          name: api-pod
+      namespaceSelector:        # can be used to select pods from the specific namespace
+        matchLabels:
+          name: prod
+    - ipBlock:                  # Rule 2
+        cidr: 192.168.5.10/32
+    ports:
+    - protocol: TCP
+      port: 3306
+```
+
+>[!Caution]
+> Please note, in the above `policyTypes`, we have just the `Ingress` policies and NOT the `Egress` so, here only the `Ingress` policy is regulated but, the `Egress` allows all and NO restriction for it until it is defined in the `policyTypes`.
+
+##### Egress Policy
+
+```yaml
+# Egress Policy
+apiVersion: netowkring.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-policy
+spec:
+  podSelector:
+    matchLabels:
+      role: db
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:              # Rule 1
+        matchLabels:
+          name: api-pod
+    ports:
+    - protocol: TCP
+      port: 3306
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 192.168.5.10/32
+    ports:
+    - protocol: TCP
+      port: 80
+```
+
+>[!Important]
+> Please note, in the above `policyTypes`, we have both the `Ingress` and `Egress` policy types so, both the `Incoming` and the `Outgoing` policy types are regulated.
+
+##### Bonus Tip:
+
+If you want to check, whether a specific component is a `array` or `string` or `integer` or `list`, then we can use this command and explain it further:
+
+```bash
+### Example 1:
+$ kubectl explain networkpolicy.spec.ingress.ports
+GROUP:      networking.k8s.io
+KIND:       NetworkPolicy
+VERSION:    v1
+
+FIELD: ports <[]NetworkPolicyPort>
+
+DESCRIPTION:
+    ports is a list of ports which should be made accessible on the pods
+    selected for this rule. Each item in this list is combined using a logical
+    OR. If this field is empty or missing, this rule matches all ports (traffic
+    not restricted by port). If this field is present and contains at least one
+    item, then this rule allows traffic only if the traffic matches at least one
+    port in the list.
+    NetworkPolicyPort describes a port to allow traffic on
+    
+FIELDS:
+  endPort       <integer>
+    endPort indicates that the range of ports from port to endPort if set,
+    inclusive, should be allowed by the policy. This field cannot be defined if
+    the port field is not defined or if the port field is defined as a named
+    (string) port. The endPort must be equal or greater than port.
+
+  port  <IntOrString>
+    port represents the port on the given protocol. This can either be a
+    numerical or named port on a pod. If this field is not provided, this
+    matches all port names and numbers. If present, only traffic on the
+    specified protocol AND port will be matched.
+
+  protocol      <string>
+  enum: SCTP, TCP, UDP
+    protocol represents the protocol (TCP, UDP, or SCTP) which traffic must
+    match. If not specified, this field defaults to TCP.
+    
+    Possible enum values:
+     - `"SCTP"` is the SCTP protocol.
+     - `"TCP"` is the TCP protocol.
+     - `"UDP"` is the UDP protocol.
+
+### Example 2:
+
+$ kubectl explain networkpolicy.spec.egress.to
+GROUP:      networking.k8s.io
+KIND:       NetworkPolicy
+VERSION:    v1
+
+FIELD: to <[]NetworkPolicyPeer>
+
+DESCRIPTION:
+    to is a list of destinations for outgoing traffic of pods selected for this
+    rule. Items in this list are combined using a logical OR operation. If this
+    field is empty or missing, this rule matches all destinations (traffic not
+    restricted by destination). If this field is present and contains at least
+    one item, this rule allows traffic only if the traffic matches at least one
+    item in the to list.
+    NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain
+    combinations of fields are allowed
+    
+FIELDS:
+  ipBlock       <IPBlock>
+    ipBlock defines policy on a particular IPBlock. If this field is set then
+    neither of the other fields can be.
+
+  namespaceSelector     <LabelSelector>
+    namespaceSelector selects namespaces using cluster-scoped labels. This field
+    follows standard label selector semantics; if present but empty, it selects
+    all namespaces.
+    
+    If podSelector is also set, then the NetworkPolicyPeer as a whole selects
+    the pods matching podSelector in the namespaces selected by
+    namespaceSelector. Otherwise it selects all pods in the namespaces selected
+    by namespaceSelector.
+
+  podSelector   <LabelSelector>
+    podSelector is a label selector which selects pods. This field follows
+    standard label selector semantics; if present but empty, it selects all
+    pods.
+    
+    If namespaceSelector is also set, then the NetworkPolicyPeer as a whole
+    selects the pods matching podSelector in the Namespaces selected by
+    NamespaceSelector. Otherwise it selects the pods matching podSelector in the
+    policy's own namespace.
+```
+
+##### Commands Used:
+
+```bash
+$ kubectl api-resources
+or 
+$ kubectl api-resources | grep -e "network"
+ingressclasses                                   networking.k8s.io/v1              false        IngressClass
+ingresses                           ing          networking.k8s.io/v1              true         Ingress
+networkpolicies                     netpol       networking.k8s.io/v1              true         NetworkPolicy
+or 
+$ kubectl api-resources | head -n 1; kubectl api-resources | grep -e "network"
+or
+$ kubectl api-resources | awk 'NR==1 || /network/'
+
+$ kubectl get pod
+NAME       READY   STATUS    RESTARTS   AGE
+external   1/1     Running   0          6m31s
+internal   1/1     Running   0          6m31s
+mysql      1/1     Running   0          6m31s
+payroll    1/1     Running   0          6m31s
+
+$ kubectl get netpol
+NAME             POD-SELECTOR   AGE
+payroll-policy   name=payroll   8m8s
+
+$ kubectl get netpol -A
+NAMESPACE   NAME             POD-SELECTOR   AGE
+default     payroll-policy   name=payroll   8m13s
+
+$ kubectl get netpol payroll-policy -o yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"networking.k8s.io/v1","kind":"NetworkPolicy","metadata":{"annotations":{},"name":"payroll-policy","namespace":"default"},"spec":{"ingress":[{"from":[{"podSelector":{"matchLabels":{"name":"internal"}}}],"ports":[{"port":8080,"protocol":"TCP"}]}],"podSelector":{"matchLabels":{"name":"payroll"}},"policyTypes":["Ingress"]}}
+  creationTimestamp: "2025-01-17T15:16:31Z"
+  generation: 1
+  name: payroll-policy
+  namespace: default
+  resourceVersion: "1967"
+  uid: a06eb044-8610-44a8-95a2-3542709ee6b0
+spec:
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: internal
+    ports:
+    - port: 8080
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      name: payroll
+  policyTypes:
+  - Ingress
+```
+
+>[!Important]
+> **EXAM TIP**
+> A good trick is to create a bash `alias` to `kubectl --dry-run=client -oyaml` and use that to generate deployment, configmap, pod, etc manifests that you can pipe to a file and tweak.
+> Try performing the complete EXAM in the [killer.sh](https://killer.sh/cka)
+
+-----
+
+#### Scenario:
+
+Create a network policy to allow traffic from the `Internal application` only to the `payroll-service` and `db-service`.
+
+Use the spec given below. You might want to enable `ingress traffic` to the pod to test your rules in the UI.
 
 
+```bash
+Policy Name: internal-policy
+Policy Type: Egress
+Egress Allow: payroll
+Payroll Port: 8080
+Egress Allow: mysql
+MySQL Port: 3306
+```
+
+![example_cluster_services_configuration](example_cluster_services_configuration.png)
+
+#### Solution:
+
+```yaml
+# internal-policy.yaml
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: internal-policy
+  namespace: default
+spec:
+  podSelector: # Applies to pods labeled as "internal"
+    matchLabels:
+      name: internal
+  policyTypes:
+    - Egress
+  egress:
+    # Allow traffic to "payroll" pod on port 8080 only
+    - to:
+        - podSelector:
+            matchLabels:
+              name: payroll
+      ports:
+        - port: 8080
+          protocol: TCP
+    # Allow traffic to "mysql" pod on port 3306 only
+    - to:
+        - podSelector:
+            matchLabels:
+              name: mysql
+      ports:
+        - port: 3306
+          protocol: TCP
+```
+
+--------
+
+### Kubectx and Kubens - Command Line Utilities:
+
+Throughout the course, you have had to work on several different namespaces in the practice lab environments. In some labs, you also had to switch between several contexts.
+
+While this is excellent for hands-on practice, in a real “live” Kubernetes cluster implemented for production, there could be a possibility of often switching between a large number of namespaces and clusters.
+
+This can quickly become a confusing and overwhelming task if you have to rely on kubectl alone.
+
+This is where command line tools such as kubectx and kubens come into the picture.
+
+Reference:https://github.com/ahmetb/kubectx
+
+#### Kubectx:
+
+With this tool, you don’t have to make use of lengthy `kubectl config` commands to switch between contexts. This tool is particularly useful to switch context between clusters in a multi-cluster environment.
+
+##### Installation:
+
+```bash
+$ sudo git clone https://github.com/ahmetb/kubectx /opt/kubectx
+$ sudo ln -s /opt/kubectx/kubectx /usr/local/bin/kubectx
+```
+Syntax:
+
+To list all contexts:
+
+```bash
+$ kubectx
+```
+
+To switch to a new context:
+
+```bash
+$ kubectx
+```
+
+To switch back to the previous context:
+
+```bash
+$ kubectx –
+```
+
+To see the current context:
+
+```bash
+$ kubectx -c
+```
+
+#### Kubens:
+
+This tool allows users to switch between namespaces quickly with a simple command.
+
+##### Installation:
+
+```bash
+$ sudo git clone https://github.com/ahmetb/kubectx /opt/kubectx
+$ sudo ln -s /opt/kubectx/kubens /usr/local/bin/kubens
+```
+
+Syntax:
+
+To switch to a new namespace:
+
+```bash
+$ kubens
+```
+
+To switch back to previous namespace:
+
+```bash
+kubens –
+```
+
+-----
