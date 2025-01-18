@@ -5346,7 +5346,7 @@ sequenceDiagram
 ```
 ----
 
-##### RBAC - Role based access control
+#### RBAC - Role based access control
 
 How do we create a role? again, using an object:
 
@@ -5380,7 +5380,7 @@ $ kubectl apply -f developer-role.yaml
 
 Now, the role is created successfully, but we need to associate the `users` i.e. `developers` in this scenario to the `role`.
 
-###### Bonus Tip:
+##### Bonus Tip:
 
 Say, you wanted to give access to a specific pod for a Role instead of all the pods. For example, let's consider there are 5 pods - `blue, green, pink, orange, yellow`, let's try to give access only to `blue` and `green` pod.
 
@@ -5994,5 +5994,694 @@ https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/
 
 ----
 
+### Image Security
+
+Securing images, and how to make use of the images from the `private repository` or `secured repository`.
+
+Usually, when we have `image: nginx`, but actually this translates to `image: docker.io/library/nginx`
+So,
+**
+- Registry -> docker.io
+- User/account -> library
+- Image/Repository -> nginx
+**
+
+As the `nginx` is a well-known repository or image, it is aliased as just `nginx`.
+
+Also, for an example of the `private repository` is -> `gcr.io/kubernetes-e2e-test-images/dnsutils`
+Where,
+**
+- Registry -> gcr.io
+- User/account -> kubernetes-e2e-test-images
+- Image/Repository -> dnsutils
+**
+
+In Private Repository, to access the image, we must perform the below steps:
+
+- docker login private-registry.io
+- docker run private-registry.io/apps/internal-app
+
+But, when creating a pod, how do we do the above steps?
 
 
+```bash
+# We should create a secret and attach that secret to the pod
+
+$ kubectl create secret docker-registry <secret-name> \
+--docker-server=private-registry.io \
+--docker-username=registry-user \
+--docker-password=registry-password \
+--docker-email=registry-user@org.com
+
+# Example:
+
+$ kubectl create secret docker-registry private-reg-cred \
+> --docker-server=myprivateregistry.com:5000 \
+> --docker-username=dock_user \
+> --docker-password=dock_password \
+> --docker-email=dock_user@myprivateregistry.com
+secret/private-reg-cred created
+```
+
+```yaml
+# pod-definition-file.yaml attached with the private registry
+
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: pod-private-repo
+spec:
+  containers:
+  - name: private-image
+    image: private-registry.io/apps/internal-app
+  imagePullSecrets:
+  - name: <secret-name>
+```
+
+Here's a Scenario, where there is already a deployment:
+
+```yaml
+$ kubectl get deployments.apps web -o yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: web
+  name: web
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+...
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: web
+    spec:
+      containers:
+      - image: myprivateregistry.com:5000/nginx:alpine    ## Private Registry
+        imagePullPolicy: IfNotPresent
+        name: nginx
+...
+...
+```
+As we have created the secret `private-reg-cred` so, we can edit the deployment and associate it in the containers:
+
+```yaml
+$ kubectl get deployments.apps web -o yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: web
+  name: web
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+...
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      imagePullSecrets:         ## Added the secrets so it can authenticate successfully
+      - name: private-reg-cred
+      containers:
+      - image: myprivateregistry.com:5000/nginx:alpine    ## Private Registry
+        imagePullPolicy: IfNotPresent
+        name: nginx
+...
+...
+```
+Now, post this change the pods are `running` successfully, let's inspect those pods:
+
+```bash
+$ kubectl describe pod web-8569544bdb-m9h2g
+Name:             web-8569544bdb-m9h2g
+Namespace:        default
+Priority:         0
+Service Account:  default
+Node:             controlplane/192.168.121.237
+Start Time:       Fri, 17 Jan 2025 01:31:24 +0000
+Labels:           app=web
+                  pod-template-hash=8569544bdb
+Annotations:      <none>
+Status:           Running
+IP:               10.50.0.6
+IPs:
+  IP:           10.50.0.6
+Controlled By:  ReplicaSet/web-8569544bdb
+Containers:
+  nginx:
+    Container ID:   containerd://48cc41c8e059a020961f940e014bab9d17b1985be50ae3c28ce18de7dd742c31
+    Image:          myprivateregistry.com:5000/nginx:alpine
+    Image ID:       docker.io/library/nginx@sha256:814a8e88df978ade80e584cc5b333144b9372a8e3c98872d07137dbf3b44d0e4
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Fri, 17 Jan 2025 01:31:25 +0000
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-lnfrb (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-lnfrb:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age    From               Message
+  ----    ------     ----   ----               -------
+  Normal  Scheduled  3m49s  default-scheduler  Successfully assigned default/web-8569544bdb-m9h2g to controlplane
+  Normal  Pulling    3m48s  kubelet            Pulling image "myprivateregistry.com:5000/nginx:alpine"
+  Normal  Pulled     3m48s  kubelet            Successfully pulled image "myprivateregistry.com:5000/nginx:alpine" in 119ms (119ms including waiting). Image size: 20534112 bytes.
+  Normal  Created    3m48s  kubelet            Created container nginx
+  Normal  Started    3m48s  kubelet            Started container nginx
+```
+
+We could clearly notice that the image was pulled from the `myprivateregistry.com:5000/nginx:alpine` as you see in the events.
+
+------
+
+### Pre-requisite Security in Docker
+
+
+##### process isolation
+
+Please note,  process `PID` varies between the `host` and the `docker container`. 
+
+Let's say, you run `docker run sleep 3600`, if you notice this within the `docker container` as `ps aux`, you can see the `sleep 3600` as `PID` is `1` and the `user` is `root`.
+
+But, when you run the same `ps aux` in the `host` terminal where the docker is installed, you would still see this `sleep 3600` but, having a different `PID` why because, both of isolated using a concept called `namespace` and `process isolation`.
+
+By default, `host` has a namespace and the `docker` container(s) have a namespace where both does not get overlapped. At firstsight, it might look the same but, it's NOT.
+
+That said, there is an interesting concept called `Linux Capabilities` where, we can extend the capabilities of the user in the docker i.e. `root` similar to the user in the host, also `root`. **Remember, both the `root` user(s) capabilities are different. In short, the `root` user in the docker does not have all capabilities to bypass or update or modify the data in the `host` side. So, we can extend the privileges for the `root` user in the docker container.
+
+Here is the difference in the processes:
+
+```bash
+# Running in the host where, the command sleep 4800 is executed
+$ ps aux
+PID   USER     TIME  COMMAND
+    1 root      0:00 {kinit.sh} /bin/bash /usr/bin/kinit.sh
+   56 root      1:00 {k3s-server} /usr/bin/k3s server
+  376 root      0:15 containerd 
+ ...
+ ...
+ 8778 root      0:00 /var/lib/rancher/k3s/data/d837e0b203a84cc7bfbb4a3054fc1d95d2b9ad5e460ed34401ff795b9c03118b/bin/containerd-shim
+ 8804 65535     0:00 /pause
+ 8910 root      0:00 sleep 4800        ### Same command but, the PID is different in the host
+ 9608 root      0:00 /usr/bin/script -q -f /root/.terminal_logs/terminal.log bash -c sudo su -
+ 9610 root      0:00 -bash
+ 9958 root      0:00 ps aux
+
+# Running inside the container where, the command sleep 4800 is executed, the user is same but, the PID is different
+$ crictl exec -it 9cc7b88780a0d /bin/sh
+# ps aux
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root           1  0.0  0.0   2696  1064 ?        Ss   13:26   0:00 sleep 4800       ### Same command but, the PID is different in the container
+root          62  0.0  0.0   2800  1088 pts/0    Ss   13:29   0:00 /bin/sh
+root          68  0.0  0.0   7888  4072 pts/0    R+   13:29   0:00 ps aux
+# exit
+ ```
+
+##### Linux Capabilities
+
+List of all capabilities, can be observed in the below file:
+
+```bash
+/usr/include/linux/capability.h
+```
+
+Have attached the capability file from a docker container here: [docker_container_capabilities.h.file.txt](certified-kubernetes-administrator/docker_container_capabilities.h.file.txt)
+
+To Extend a `Capability` or use a different user instead of the `root`, you can run:
+
+```bash
+$ docker run --user=1001 ubuntu sleep 3600
+
+$ docker run --cap-add MAC_ADMIN ubuntu sleep 3600
+```
+
+-----
+
+### Security Contexts
+
+Container Security in Kubernetes is same as the Docker container:
+
+In K8s, you have an extra option to tune the `security contexts` i.e. you can spread the capabilities within the `pod` i.e. all containers in the pod will comply to those settings. Also, you can narrow it down to a `container` as well. Or, you can mix both - add `pod` level capabilities as well as the `container` level capabilities, where the `container` level capabilities are taken into consideration instead of the `pod` level capabilities because it has more priority.
+
+```yaml
+# pod-definition-file.v1.yaml
+
+## Adding Pod-Level Security Contexts
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-app
+spec:
+  securityContext:      ## Adding Pod-level security contexts
+    runAsUser: 1000
+  containers:
+  - image: nginx
+    name: nginx-app
+    command: ["sleep","3600"]
+```
+
+```yaml
+# pod-definition-file.v2.yaml
+
+## Adding container-Level Security Contexts and Security Capabilities
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-app
+spec:
+  containers:
+  - image: nginx
+    name: nginx-app
+    command: ["sleep","3600"]
+    securityContext:      ## Adding container-level security contexts
+      runAsUser: 1000
+      capabilities:       ## Adding container-level capabilities
+        add: ["MAC_ADMIN"]
+```
+
+>[!Important]
+> Please note, the `capabilities` can only be added to the `container` and NOT the `pod` so, it will NOT work if you added the `capabilities` to the pod's security context, it will throw an error.
+
+##### Commands used
+
+```bash
+# Post updating the user to run the `sleep 4800` command:
+
+$ ps aux
+PID   USER     TIME  COMMAND
+    1 root      0:00 {kinit.sh} /bin/bash /usr/bin/kinit.sh
+   56 root      0:40 {k3s-server} /usr/bin/k3s server
+  385 root      0:11 containerd 
+...
+...
+ 7033 root      0:00 /var/lib/rancher/k3s/data/d837e0b203a84cc7bfbb4a3054fc1d95d2b9ad5e460ed34401f
+ 7060 1010      0:00 /pause
+ 7165 1010      0:00 sleep 4800   ### If you see here, it got updated from `root` to user `1010`
+ 7308 root      0:00 ps aux
+
+$ cat multi-pod.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: multi-pod
+spec:
+  securityContext:
+    runAsUser: 1001
+  containers:
+  -  image: ubuntu
+     name: web
+     command: ["sleep", "5000"]
+     securityContext:
+      runAsUser: 1002
+
+  -  image: ubuntu
+     name: sidecar
+     command: ["sleep", "5000"]
+
+```
+
+### Network Policies
+
+#### Traffic
+
+#### Network Security
+
+##### Ingress Policy
+```yaml
+# Ingress Policy
+apiVersion: netowkring.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-policy
+spec:
+  podSelector:
+    matchLabels:
+      role: db
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:              # Rule 1
+        matchLabels:
+          name: api-pod
+      namespaceSelector:        # can be used to select pods from the specific namespace
+        matchLabels:
+          name: prod
+    - ipBlock:                  # Rule 2
+        cidr: 192.168.5.10/32
+    ports:
+    - protocol: TCP
+      port: 3306
+```
+
+>[!Caution]
+> Please note, in the above `policyTypes`, we have just the `Ingress` policies and NOT the `Egress` so, here only the `Ingress` policy is regulated but, the `Egress` allows all and NO restriction for it until it is defined in the `policyTypes`.
+
+##### Egress Policy
+
+```yaml
+# Egress Policy
+apiVersion: netowkring.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-policy
+spec:
+  podSelector:
+    matchLabels:
+      role: db
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:              # Rule 1
+        matchLabels:
+          name: api-pod
+    ports:
+    - protocol: TCP
+      port: 3306
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 192.168.5.10/32
+    ports:
+    - protocol: TCP
+      port: 80
+```
+
+>[!Important]
+> Please note, in the above `policyTypes`, we have both the `Ingress` and `Egress` policy types so, both the `Incoming` and the `Outgoing` policy types are regulated.
+
+##### Bonus Tip:
+
+If you want to check, whether a specific component is a `array` or `string` or `integer` or `list`, then we can use this command and explain it further:
+
+```bash
+### Example 1:
+$ kubectl explain networkpolicy.spec.ingress.ports
+GROUP:      networking.k8s.io
+KIND:       NetworkPolicy
+VERSION:    v1
+
+FIELD: ports <[]NetworkPolicyPort>
+
+DESCRIPTION:
+    ports is a list of ports which should be made accessible on the pods
+    selected for this rule. Each item in this list is combined using a logical
+    OR. If this field is empty or missing, this rule matches all ports (traffic
+    not restricted by port). If this field is present and contains at least one
+    item, then this rule allows traffic only if the traffic matches at least one
+    port in the list.
+    NetworkPolicyPort describes a port to allow traffic on
+    
+FIELDS:
+  endPort       <integer>
+    endPort indicates that the range of ports from port to endPort if set,
+    inclusive, should be allowed by the policy. This field cannot be defined if
+    the port field is not defined or if the port field is defined as a named
+    (string) port. The endPort must be equal or greater than port.
+
+  port  <IntOrString>
+    port represents the port on the given protocol. This can either be a
+    numerical or named port on a pod. If this field is not provided, this
+    matches all port names and numbers. If present, only traffic on the
+    specified protocol AND port will be matched.
+
+  protocol      <string>
+  enum: SCTP, TCP, UDP
+    protocol represents the protocol (TCP, UDP, or SCTP) which traffic must
+    match. If not specified, this field defaults to TCP.
+    
+    Possible enum values:
+     - `"SCTP"` is the SCTP protocol.
+     - `"TCP"` is the TCP protocol.
+     - `"UDP"` is the UDP protocol.
+
+### Example 2:
+
+$ kubectl explain networkpolicy.spec.egress.to
+GROUP:      networking.k8s.io
+KIND:       NetworkPolicy
+VERSION:    v1
+
+FIELD: to <[]NetworkPolicyPeer>
+
+DESCRIPTION:
+    to is a list of destinations for outgoing traffic of pods selected for this
+    rule. Items in this list are combined using a logical OR operation. If this
+    field is empty or missing, this rule matches all destinations (traffic not
+    restricted by destination). If this field is present and contains at least
+    one item, this rule allows traffic only if the traffic matches at least one
+    item in the to list.
+    NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain
+    combinations of fields are allowed
+    
+FIELDS:
+  ipBlock       <IPBlock>
+    ipBlock defines policy on a particular IPBlock. If this field is set then
+    neither of the other fields can be.
+
+  namespaceSelector     <LabelSelector>
+    namespaceSelector selects namespaces using cluster-scoped labels. This field
+    follows standard label selector semantics; if present but empty, it selects
+    all namespaces.
+    
+    If podSelector is also set, then the NetworkPolicyPeer as a whole selects
+    the pods matching podSelector in the namespaces selected by
+    namespaceSelector. Otherwise it selects all pods in the namespaces selected
+    by namespaceSelector.
+
+  podSelector   <LabelSelector>
+    podSelector is a label selector which selects pods. This field follows
+    standard label selector semantics; if present but empty, it selects all
+    pods.
+    
+    If namespaceSelector is also set, then the NetworkPolicyPeer as a whole
+    selects the pods matching podSelector in the Namespaces selected by
+    NamespaceSelector. Otherwise it selects the pods matching podSelector in the
+    policy's own namespace.
+```
+
+##### Commands Used:
+
+```bash
+$ kubectl api-resources
+or 
+$ kubectl api-resources | grep -e "network"
+ingressclasses                                   networking.k8s.io/v1              false        IngressClass
+ingresses                           ing          networking.k8s.io/v1              true         Ingress
+networkpolicies                     netpol       networking.k8s.io/v1              true         NetworkPolicy
+or 
+$ kubectl api-resources | head -n 1; kubectl api-resources | grep -e "network"
+or
+$ kubectl api-resources | awk 'NR==1 || /network/'
+
+$ kubectl get pod
+NAME       READY   STATUS    RESTARTS   AGE
+external   1/1     Running   0          6m31s
+internal   1/1     Running   0          6m31s
+mysql      1/1     Running   0          6m31s
+payroll    1/1     Running   0          6m31s
+
+$ kubectl get netpol
+NAME             POD-SELECTOR   AGE
+payroll-policy   name=payroll   8m8s
+
+$ kubectl get netpol -A
+NAMESPACE   NAME             POD-SELECTOR   AGE
+default     payroll-policy   name=payroll   8m13s
+
+$ kubectl get netpol payroll-policy -o yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"networking.k8s.io/v1","kind":"NetworkPolicy","metadata":{"annotations":{},"name":"payroll-policy","namespace":"default"},"spec":{"ingress":[{"from":[{"podSelector":{"matchLabels":{"name":"internal"}}}],"ports":[{"port":8080,"protocol":"TCP"}]}],"podSelector":{"matchLabels":{"name":"payroll"}},"policyTypes":["Ingress"]}}
+  creationTimestamp: "2025-01-17T15:16:31Z"
+  generation: 1
+  name: payroll-policy
+  namespace: default
+  resourceVersion: "1967"
+  uid: a06eb044-8610-44a8-95a2-3542709ee6b0
+spec:
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          name: internal
+    ports:
+    - port: 8080
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      name: payroll
+  policyTypes:
+  - Ingress
+```
+
+>[!Important]
+> **EXAM TIP**
+> A good trick is to create a bash `alias` to `kubectl --dry-run=client -oyaml` and use that to generate deployment, configmap, pod, etc manifests that you can pipe to a file and tweak.
+> Try performing the complete EXAM in the [killer.sh](https://killer.sh/cka)
+
+-----
+
+#### Scenario:
+
+Create a network policy to allow traffic from the `Internal application` only to the `payroll-service` and `db-service`.
+
+Use the spec given below. You might want to enable `ingress traffic` to the pod to test your rules in the UI.
+
+
+```bash
+Policy Name: internal-policy
+Policy Type: Egress
+Egress Allow: payroll
+Payroll Port: 8080
+Egress Allow: mysql
+MySQL Port: 3306
+```
+
+![example_cluster_services_configuration](example_cluster_services_configuration.png)
+
+#### Solution:
+
+```yaml
+# internal-policy.yaml
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: internal-policy
+  namespace: default
+spec:
+  podSelector: # Applies to pods labeled as "internal"
+    matchLabels:
+      name: internal
+  policyTypes:
+    - Egress
+  egress:
+    # Allow traffic to "payroll" pod on port 8080 only
+    - to:
+        - podSelector:
+            matchLabels:
+              name: payroll
+      ports:
+        - port: 8080
+          protocol: TCP
+    # Allow traffic to "mysql" pod on port 3306 only
+    - to:
+        - podSelector:
+            matchLabels:
+              name: mysql
+      ports:
+        - port: 3306
+          protocol: TCP
+```
+
+--------
+
+### Kubectx and Kubens - Command Line Utilities:
+
+Throughout the course, you have had to work on several different namespaces in the practice lab environments. In some labs, you also had to switch between several contexts.
+
+While this is excellent for hands-on practice, in a real “live” Kubernetes cluster implemented for production, there could be a possibility of often switching between a large number of namespaces and clusters.
+
+This can quickly become a confusing and overwhelming task if you have to rely on kubectl alone.
+
+This is where command line tools such as kubectx and kubens come into the picture.
+
+Reference:https://github.com/ahmetb/kubectx
+
+#### Kubectx:
+
+With this tool, you don’t have to make use of lengthy `kubectl config` commands to switch between contexts. This tool is particularly useful to switch context between clusters in a multi-cluster environment.
+
+##### Installation:
+
+```bash
+$ sudo git clone https://github.com/ahmetb/kubectx /opt/kubectx
+$ sudo ln -s /opt/kubectx/kubectx /usr/local/bin/kubectx
+```
+Syntax:
+
+To list all contexts:
+
+```bash
+$ kubectx
+```
+
+To switch to a new context:
+
+```bash
+$ kubectx
+```
+
+To switch back to the previous context:
+
+```bash
+$ kubectx –
+```
+
+To see the current context:
+
+```bash
+$ kubectx -c
+```
+
+#### Kubens:
+
+This tool allows users to switch between namespaces quickly with a simple command.
+
+##### Installation:
+
+```bash
+$ sudo git clone https://github.com/ahmetb/kubectx /opt/kubectx
+$ sudo ln -s /opt/kubectx/kubens /usr/local/bin/kubens
+```
+
+Syntax:
+
+To switch to a new namespace:
+
+```bash
+$ kubens
+```
+
+To switch back to previous namespace:
+
+```bash
+kubens –
+```
+
+-----
