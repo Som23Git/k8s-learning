@@ -6684,4 +6684,754 @@ To switch back to previous namespace:
 kubens –
 ```
 
+----------
+
+## :: Storage
+
+----------
+
+### Storage Drivers - Docker Storage - File Systems
+
+File System
+
+When you install, it creates a folder structure:
+
+- /var/lib/docker
+  - auf
+  - containers
+  - image
+  - volumes
+
+COPY-ON-WRITE
+
+
+volume mounting
+
+bind mounting from any location from the docker host
+
+Common docker storage drivers:
+
+- AUFS
+- ZFS
+- BTRFS
+- DEVICE_MAPPER
+- OVERLAY
+- OVERLAY2
+
+Please note, the `volume drivers` are handled by the volume driver plugins.
+
+```bash
+$ docker run -it --name mysql --volume-driver rexray/ebs --mount src=ebs-vol,target=/var/lib/mysql
+```
+
+### Container Storage Interface
+
+rocket and cri-o,
+
+> CRI - Container Runtime Interface - CRI standards
+
+> CNI - Container Networking Interface -> It got its standards
+
+> CSI - Container Storage Interface -> With CSI, you write your own drivers with the CSI standards.
+
+Here is a Github link for the `CSI standards`: https://github.com/container-storage-interface/spec and https://kubernetes-csi.github.io/docs/.
+
+![github_csi](github_csi.png)
+
+Note, CSI is an universal standard.
+
+![how_csi_looks_like](how_csi_looks_like.png)
+
+If you look at the above image:
+
+- There are three sections: `Container Interface i.e. Kubernetes -> RPC(Remote Procedure Call) -> Storage Solution`
+
+When the container is created, the kubernetes `should call to provision a new volume` -> `RPC` -> Then, the storage solution `should provision a new volume on the storage` and share the details back to the `kubernetes` or the `container orchestration tool`.
+
+----
+
+### Volumes & Mounts
+
+
+
+Volume types
+
+Persistent Volumes:
+
+Access modes: `ReadOnlyMany`, `ReadWriteOnce`, and `ReadWriteMany`
+
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-vol1
+spec:
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: 1Gi
+  hostPath:             ### Do not use this in the production scenario
+    path: /tmp/data
+```
+Production Scenario:
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-vol1
+spec:
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: 1Gi
+  awsElasticBlockStore:
+    volumeID: <volume-id>
+    fsType: ext4
+```
+
+Persistent Volume Claims:
+
+```bash
+$ kubectl create -f pv-definition.yaml
+$ kubectl get persistentvolume
+```
+
+
 -----
+
+### Persistent Volume Claims
+
+
+```yaml
+# pvc-definition-file.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+```
+
+```bash
+# To check whether the PVC is created
+$ kubectl get persistentvolumeclaim
+```
+
+```yaml
+# persistent-volume-definition-file.yaml
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-vol1
+spec:
+  accessModes:
+    - ReadWriteonce
+  capacity:
+    storage: 1Gi
+  awsElasticBlockStore:
+    volumeID: <volume-id>
+    fsType: ext4
+```
+
+Now, the `persistentvolumeclaims` will get associated to the `persistentvolumes` that are available where, in this scenario, the `PV` is `1Gi` and the requirement from the `PVC` is `500Mi`.
+
+To delete a PVC:
+
+```bash
+$ kubectl delete persistentvolumeclaim myclaim
+```
+
+>[!Important] Specifically if the `Persistent Volume` is used by the `Persistent Volume Claims` i.e. mounted to the pods. It will NOT get `DELETED` if the pod is `deleted`. Also, it depends on the `persistentVolumeReclaimPolicy: Retain` (this holds up the storage) or `persistentVolumeReclaimPolicy: Delete` (this frees up the storage) or `persistentVolumeReclaimPolicy: Recycle` (this deletes the data in the storage and make it available for the new pods or persistentvolumeclaims).
+
+-----
+
+### Using PVC in Pods
+
+Once you create a PVC use it in a POD definition file by specifying the PVC Claim name under persistentVolumeClaim section in the volumes section like this:
+
+```yaml
+# Using PVC in pods
+apiVersion: v1
+kind: Pod
+metadata:
+ name: mypod
+spec:
+ containers:
+  - name: myfrontend
+   image: nginx
+   volumeMounts:
+   - mountPath: "/var/www/html"
+    name: mypd
+ volumes:
+  - name: mypd
+   persistentVolumeClaim:
+    claimName: myclaim
+```
+
+The same is true for `ReplicaSets or Deployments`. Add this to the pod template section of a Deployment on ReplicaSet.
+
+Reference URL: [https://kubernetes.io/docs/concepts/storage/persistent-volumes/#claims-as-volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#claims-as-volumes)
+
+------
+
+##### Commands Used:
+
+
+```yaml
+# pvc-definition-file.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+```
+```bash
+$ kubectl get pvc
+NAME      STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+myclaim   Pending   
+
+$ kubectl get pvc
+NAME      STATUS   VOLUME    CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+myclaim   Bound    pv-vol1   1Gi        RWO                           <unset>                 67s
+
+# Tried again 
+$ kubectl get pv,pvc
+NAME                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM             STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE
+persistentvolume/pv-vol1   1Gi        RWO            Retain           Bound    default/myclaim                  <unset>                          10s
+
+NAME                            STATUS   VOLUME    CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+persistentvolumeclaim/myclaim   Bound    pv-vol1   1Gi        RWO                           <unset>                 5s
+```
+
+```yaml
+# Using PVC in pods
+apiVersion: v1
+kind: Pod
+metadata:
+ name: mypod
+spec:
+ containers:
+  - name: myfrontend
+   image: nginx
+   volumeMounts:
+   - mountPath: "/log"
+    name: pv-vol1
+ volumes:
+  - name: pv-vol1
+   persistentVolumeClaim:
+    claimName: myclaim
+```
+
+```yaml
+$ kubectl get pod webapp -o yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: webapp
+  namespace: default
+spec:
+  containers:
+  - env:
+    - name: LOG_HANDLERS
+      value: file
+    image: kodekloud/event-simulator
+    imagePullPolicy: Always
+    name: event-simulator
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-h8kx2
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  nodeName: controlplane
+  preemptionPolicy: PreemptLowerPriority
+  priority: 0
+  restartPolicy: Always
+  schedulerName: default-scheduler
+  securityContext: {}
+  serviceAccount: default
+  serviceAccountName: default
+  terminationGracePeriodSeconds: 30
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  volumes:
+  - name: kube-api-access-h8kx2
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          expirationSeconds: 3607
+          path: token
+      - configMap:
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: kube-root-ca.crt
+      - downwardAPI:
+          items:
+          - fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+            path: namespace
+status:
+  conditions:
+  - lastProbeTime: null
+    lastTransitionTime: "2025-01-18T23:55:27Z"
+    status: "True"
+    type: PodReadyToStartContainers
+  - lastProbeTime: null
+    lastTransitionTime: "2025-01-18T23:55:23Z"
+    status: "True"
+    type: Initialized
+  - lastProbeTime: null
+    lastTransitionTime: "2025-01-18T23:55:27Z"
+    status: "True"
+    type: Ready
+  - lastProbeTime: null
+    lastTransitionTime: "2025-01-18T23:55:27Z"
+    status: "True"
+    type: ContainersReady
+  - lastProbeTime: null
+    lastTransitionTime: "2025-01-18T23:55:23Z"
+    status: "True"
+    type: PodScheduled
+  containerStatuses:
+  - containerID: containerd://be2e07d541d2b67e41df5f2726c0a8c1ecffe8d1a2231915e6e39054937e9b3d
+    image: docker.io/kodekloud/event-simulator:latest
+    imageID: docker.io/kodekloud/event-simulator@sha256:1e3e9c72136bbc76c96dd98f29c04f298c3ae241c7d44e2bf70bcc209b030bf9
+    lastState: {}
+    name: event-simulator
+    ready: true
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: "2025-01-18T23:55:26Z"
+    volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-h8kx2
+      readOnly: true
+      recursiveReadOnly: Disabled
+  hostIP: 192.168.100.158
+  hostIPs:
+  - ip: 192.168.100.158
+  phase: Running
+  podIP: 172.17.0.4
+  podIPs:
+  - ip: 172.17.0.4
+  qosClass: BestEffort
+  startTime: "2025-01-18T23:55:23Z"
+```
+
+```bash
+$ kubectl describe pod webapp
+Name:             webapp
+Namespace:        default
+Priority:         0
+Service Account:  default
+Node:             controlplane/192.168.100.158
+Start Time:       Sat, 18 Jan 2025 23:55:23 +0000
+Labels:           <none>
+Annotations:      <none>
+Status:           Running
+IP:               172.17.0.4
+IPs:
+  IP:  172.17.0.4
+Containers:
+  event-simulator:
+    Container ID:   containerd://be2e07d541d2b67e41df5f2726c0a8c1ecffe8d1a2231915e6e39054937e9b3d
+    Image:          kodekloud/event-simulator
+    Image ID:       docker.io/kodekloud/event-simulator@sha256:1e3e9c72136bbc76c96dd98f29c04f298c3ae241c7d44e2bf70bcc209b030bf9
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Sat, 18 Jan 2025 23:55:26 +0000
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      LOG_HANDLERS:  file
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-h8kx2 (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-h8kx2:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age    From               Message
+  ----    ------     ----   ----               -------
+  Normal  Scheduled  4m38s  default-scheduler  Successfully assigned default/webapp to controlplane
+  Normal  Pulling    4m37s  kubelet            Pulling image "kodekloud/event-simulator"
+  Normal  Pulled     4m35s  kubelet            Successfully pulled image "kodekloud/event-simulator" in 1.895s (1.895s including waiting). Image size: 28855042 bytes.
+  Normal  Created    4m35s  kubelet            Created container event-simulator
+  Normal  Started    4m35s  kubelet            Started container event-simulator
+```
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-vol1
+spec:
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: 1Gi
+  hostPath:             
+    path: /var/log/webapp
+
+
+```bash
+$ kubectl describe pod webapp
+Name:             webapp
+Namespace:        default
+Priority:         0
+Service Account:  default
+Node:             controlplane/192.168.100.158
+Start Time:       Sun, 19 Jan 2025 00:15:35 +0000
+Labels:           <none>
+Annotations:      <none>
+Status:           Running
+IP:               172.17.0.5
+IPs:
+  IP:  172.17.0.5
+Containers:
+  event-simulator:
+    Container ID:   containerd://930865f0a3fb3964efacee60dead9374db7e0811d00da8b4c09f7ace9b8caaac
+    Image:          kodekloud/event-simulator
+    Image ID:       docker.io/kodekloud/event-simulator@sha256:1e3e9c72136bbc76c96dd98f29c04f298c3ae241c7d44e2bf70bcc209b030bf9
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Sun, 19 Jan 2025 00:15:36 +0000
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      LOG_HANDLERS:  file
+    Mounts:
+      /log from pv-vol1 (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-h8kx2 (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  pv-vol1:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  myclaim
+    ReadOnly:   false
+  kube-api-access-h8kx2:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason   Age   From     Message
+  ----    ------   ----  ----     -------
+  Normal  Pulling  17s   kubelet  Pulling image "kodekloud/event-simulator"
+  Normal  Pulled   17s   kubelet  Successfully pulled image "kodekloud/event-simulator" in 136ms (136ms including waiting). Image size: 28855042 bytes.
+  Normal  Created  17s   kubelet  Created container event-simulator
+  Normal  Started  16s   kubelet  Started container event-simulator
+```
+
+```yaml
+cat /tmp/kubectl-edit-1546462735.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: "2025-01-18T23:55:23Z"
+  name: webapp
+  namespace: default
+  resourceVersion: "1049"
+  uid: 9ccc0f11-dcee-4fa2-911b-df8c4a7727c6
+spec:
+  containers:
+  - env:
+    - name: LOG_HANDLERS
+      value: file
+    image: kodekloud/event-simulator
+    imagePullPolicy: Always
+    name: event-simulator
+    resources: {}
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-h8kx2
+      readOnly: true
+    - mountPath: /log             #### Added a volume mount
+      name: pv-vol1
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  nodeName: controlplane
+  preemptionPolicy: PreemptLowerPriority
+  priority: 0
+  restartPolicy: Always
+  schedulerName: default-scheduler
+  securityContext: {}
+  serviceAccount: default
+  serviceAccountName: default
+  terminationGracePeriodSeconds: 30
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  volumes:
+  - name: pv-vol1                  ### Added volumes
+    persistentVolumeClaim:
+      claimName: myclaim
+  - name: kube-api-access-h8kx2
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          expirationSeconds: 3607
+          path: token
+      - configMap:
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: kube-root-ca.crt
+      - downwardAPI:
+          items:
+          - fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+            path: namespace
+```
+```bash
+$ diff --side-by-side certified-kubernetes-administrator/pod_WITHOUT_log_pv_pvc.yaml certified-kubernetes-administrator/pod_with_log_pv_pvc.yaml
+apiVersion: v1                                                  apiVersion: v1
+kind: Pod                                                       kind: Pod
+metadata:                                                       metadata:
+  name: webapp                                                    name: webapp
+  namespace: default                                              namespace: default
+spec:                                                           spec:
+  containers:                                                     containers:
+  - env:                                                          - env:
+    - name: LOG_HANDLERS                                            - name: LOG_HANDLERS
+      value: file                                                     value: file
+    image: kodekloud/event-simulator                                image: kodekloud/event-simulator
+    imagePullPolicy: Always                                         imagePullPolicy: Always
+    name: event-simulator                                           name: event-simulator
+                                                              >     resources: {}
+    terminationMessagePath: /dev/termination-log                    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File                                  terminationMessagePolicy: File
+    volumeMounts:                                                   volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccoun       - mountPath: /var/run/secrets/kubernetes.io/serviceaccoun
+      name: kube-api-access-h8kx2                                     name: kube-api-access-h8kx2
+      readOnly: true                                                  readOnly: true
+                                                              >     - mountPath: /log             #### Added a volume mount
+                                                              >       name: pv-vol1
+  dnsPolicy: ClusterFirst                                         dnsPolicy: ClusterFirst
+  enableServiceLinks: true                                        enableServiceLinks: true
+  nodeName: controlplane                                          nodeName: controlplane
+  preemptionPolicy: PreemptLowerPriority                          preemptionPolicy: PreemptLowerPriority
+  priority: 0                                                     priority: 0
+  restartPolicy: Always                                           restartPolicy: Always
+  schedulerName: default-scheduler                                schedulerName: default-scheduler
+  securityContext: {}                                             securityContext: {}
+  serviceAccount: default                                         serviceAccount: default
+  serviceAccountName: default                                     serviceAccountName: default
+  terminationGracePeriodSeconds: 30                               terminationGracePeriodSeconds: 30
+  tolerations:                                                    tolerations:
+  - effect: NoExecute                                             - effect: NoExecute
+    key: node.kubernetes.io/not-ready                               key: node.kubernetes.io/not-ready
+    operator: Exists                                                operator: Exists
+    tolerationSeconds: 300                                          tolerationSeconds: 300
+  - effect: NoExecute                                             - effect: NoExecute
+    key: node.kubernetes.io/unreachable                             key: node.kubernetes.io/unreachable
+    operator: Exists                                                operator: Exists
+    tolerationSeconds: 300                                          tolerationSeconds: 300
+  volumes:                                                        volumes:
+                                                              >   - name: pv-vol1                  ### Added volumes
+                                                              >     persistentVolumeClaim:
+                                                              >       claimName: myclaim
+  - name: kube-api-access-h8kx2                                   - name: kube-api-access-h8kx2
+    projected:                                                      projected:
+      defaultMode: 420                                                defaultMode: 420
+      sources:                                                        sources:
+      - serviceAccountToken:                                          - serviceAccountToken:
+          expirationSeconds: 3607                                         expirationSeconds: 3607
+          path: token                                                     path: token
+      - configMap:                                                    - configMap:
+          items:                                                          items:
+          - key: ca.crt                                                   - key: ca.crt
+            path: ca.crt                                                    path: ca.crt
+          name: kube-root-ca.crt                                          name: kube-root-ca.crt
+      - downwardAPI:                                                  - downwardAPI:
+          items:                                                          items:
+          - fieldRef:                                                     - fieldRef:
+              apiVersion: v1                                                  apiVersion: v1
+              fieldPath: metadata.namespace                                   fieldPath: metadata.namespace
+            path: namespace
+\ No newline at end of file
+                                                    path: namespace
+\ No newline at end of file
+```
+
+##### Added HostPath
+
+```bash
+$ kubectl describe pod webapp
+Name:             webapp
+Namespace:        default
+Priority:         0
+Service Account:  default
+Node:             controlplane/192.168.100.158
+Start Time:       Sun, 19 Jan 2025 00:40:59 +0000
+Labels:           <none>
+Annotations:      <none>
+Status:           Running
+IP:               172.17.0.6
+IPs:
+  IP:  172.17.0.6
+Containers:
+  event-simulator:
+    Container ID:   containerd://a159c9827223182113c8cc04c2d6855d29b7b858e0b41bd1839e9172a7304481
+    Image:          kodekloud/event-simulator
+    Image ID:       docker.io/kodekloud/event-simulator@sha256:1e3e9c72136bbc76c96dd98f29c04f298c3ae241c7d44e2bf70bcc209b030bf9
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Sun, 19 Jan 2025 00:41:00 +0000
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      LOG_HANDLERS:  file
+    Mounts:
+      /log from pv-vol2 (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-h8kx2 (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  pv-vol2:
+    Type:          HostPath (bare host directory volume)
+    Path:          /var/log/webapp
+    HostPathType:  
+  kube-api-access-h8kx2:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason   Age   From     Message
+  ----    ------   ----  ----     -------
+  Normal  Pulling  11s   kubelet  Pulling image "kodekloud/event-simulator"
+  Normal  Pulled   11s   kubelet  Successfully pulled image "kodekloud/event-simulator" in 138ms (138ms including waiting). Image size: 28855042 bytes.
+  Normal  Created  10s   kubelet  Created container event-simulator
+  Normal  Started  10s   kubelet  Started container event-simulator
+
+```
+
+```
+cat pv-file-2.yaml 
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-log
+spec:
+  accessModes:
+    - ReadWriteMany
+  capacity:
+    storage: 100Mi
+  hostPath:             
+    path: /pv/log
+
+$ kubectl apply -f pv-file-2.yaml 
+persistentvolume/pv-log created
+
+$ kubectl get pv,pvc
+NAME                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM   STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE
+persistentvolume/pv-log    100Mi      RWX            Retain           Available                          <unset>                          8s
+persistentvolume/pv-vol2   1Gi        RWO            Retain           Available                          <unset>                          7m54s
+
+$ kubectl apply -f pvc-file-2.yaml 
+persistentvolumeclaim/claim-log-1 created
+
+$ kubectl get pv,pvc
+NAME                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM                 STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE
+persistentvolume/pv-log    100Mi      RWX            Retain           Available                                        <unset>                          2m10s
+persistentvolume/pv-vol2   1Gi        RWO            Retain           Bound       default/claim-log-1                  <unset>                          9m56s
+
+NAME                                STATUS   VOLUME    CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+persistentvolumeclaim/claim-log-1   Bound    pv-vol2   1Gi        RWO                           <unset>                 5s
+
+cat pvc-file-2.yaml 
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: claim-log-1
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Mi
+```
+
+-----
+
+### Storage Classes
+
+![dynamic_provisioning_storage_class](dynamic_provisioning_storage_class.png)
+
+![google_cloud_storage_provisioning_storage_class](google_cloud_storage_provisioning_storage_class.png)
+
+![difference_in_storage_creation_replication_types](difference_in_storage_creation_replication_types.png)
+
+----
