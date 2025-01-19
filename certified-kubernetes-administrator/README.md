@@ -6952,7 +6952,7 @@ spec:
     volumeMounts:
     - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
       name: kube-api-access-h8kx2
-      readOnly: true
+      readOnly: true  
   dnsPolicy: ClusterFirst
   enableServiceLinks: true
   nodeName: controlplane
@@ -7433,5 +7433,71 @@ spec:
 ![google_cloud_storage_provisioning_storage_class](google_cloud_storage_provisioning_storage_class.png)
 
 ![difference_in_storage_creation_replication_types](difference_in_storage_creation_replication_types.png)
+
+##### Commands Used:
+
+```bash
+kubectl get sc
+NAME                   PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+local-path (default)   rancher.io/local-path   Delete          WaitForFirstConsumer   false                  12m
+
+$ kubectl describe sc local-path 
+Name:                  local-path
+IsDefaultClass:        Yes
+Annotations:           defaultVolumeType=local,objectset.rio.cattle.io/applied=H4sIAAAAAAAA/4yRz47UMAyHXwX53JYpnamqSBxg0V4QEhJoObuJOzVN4ypxi0areXeUMqDhwJ9j8ov9xZ+fARd+ophYAhhIKhHPVE1dqlhebjUUMHFwYODTj+jBY0pQwEyKDhXBPAOGIIrKElI+Ohpw9fokfp3p82UhMODFoocCpP9KVhNpFVkqi6qeMokz4i+5fAsUy/M2gYGpSXfJVhcv3nNwr984J+GfLQLOv/5T3sb9r6K0oM2V09pTmS5JaYbipzCbrVQ5ioGUdnmcypuJco/BgMaV4FqAx5787upP3BHTCAbqrhmak21Pw9Db5tAe20MzHJuhPnUH19m2w1cOe3fMTX+bbEEd8+USZeO8XIpgIGKwI8UMuHtWQMwD8PxRPNsLGHhHnjRr2fYdvuXgOJw/iMuAL8j6KPGRY9IHCWmdKcL1ewAAAP//KQ1Ko0kCAAA,objectset.rio.cattle.io/id=,objectset.rio.cattle.io/owner-gvk=k3s.cattle.io/v1, Kind=Addon,objectset.rio.cattle.io/owner-name=local-storage,objectset.rio.cattle.io/owner-namespace=kube-system,storageclass.kubernetes.io/is-default-class=true
+Provisioner:           rancher.io/local-path
+Parameters:            <none>
+AllowVolumeExpansion:  <unset>
+MountOptions:          <none>
+ReclaimPolicy:         Delete
+VolumeBindingMode:     WaitForFirstConsumer
+Events:                <none>
+
+### Adding More Storage Classes:
+$ kubectl get sc
+NAME                        PROVISIONER                     RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+local-path (default)        rancher.io/local-path           Delete          WaitForFirstConsumer   false                  13m
+local-storage               kubernetes.io/no-provisioner    Delete          WaitForFirstConsumer   false                  7s
+portworx-io-priority-high   kubernetes.io/portworx-volume   Delete          Immediate              false                  7s
+```
+
+The `Storage Class` called `local-storage` makes use of `VolumeBindingMode` set to `WaitForFirstConsumer`. This will delay the binding and provisioning of a `PersistentVolume` until a Pod using the `PersistentVolumeClaim` is created.
+
+```bash
+$ kubectl get pod,pv,pvc,sc
+NAME        READY   STATUS    RESTARTS   AGE
+pod/nginx   1/1     Running   0          13s
+
+NAME                        CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM               STORAGECLASS    VOLUMEATTRIBUTESCLASS   REASON   AGE
+persistentvolume/local-pv   500Mi      RWO            Retain           Bound    default/local-pvc   local-storage   <unset>                          28m
+
+NAME                              STATUS   VOLUME     CAPACITY   ACCESS MODES   STORAGECLASS    VOLUMEATTRIBUTESCLASS   AGE
+persistentvolumeclaim/local-pvc   Bound    local-pv   500Mi      RWO            local-storage   <unset>                 18m
+
+NAME                                                    PROVISIONER                     RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+storageclass.storage.k8s.io/local-path (default)        rancher.io/local-path           Delete          WaitForFirstConsumer   false                  42m
+storageclass.storage.k8s.io/local-storage               kubernetes.io/no-provisioner    Delete          WaitForFirstConsumer   false                  28m
+storageclass.storage.k8s.io/portworx-io-priority-high   kubernetes.io/portworx-volume   Delete          Immediate              false                  28m
+
+### Creation of the Storage Class
+
+$ kubectl apply -f storage.yaml 
+storageclass.storage.k8s.io/delayed-volume-sc created
+
+$ kubectl get sc
+NAME                        PROVISIONER                     RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+delayed-volume-sc           kubernetes.io/no-provisioner    Delete          WaitForFirstConsumer   false                  4s
+local-path (default)        rancher.io/local-path           Delete          WaitForFirstConsumer   false                  51m
+local-storage               kubernetes.io/no-provisioner    Delete          WaitForFirstConsumer   false                  37m
+portworx-io-priority-high   kubernetes.io/portworx-volume   Delete          Immediate              false                  37m
+
+$ cat storage.yaml 
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: delayed-volume-sc
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+```
 
 ----
