@@ -7650,3 +7650,143 @@ $ cat /proc/sys/net/ipv4/ip_forward
 
 ### DNS Configuration
 
+![networking_DNS_config_1](networking_DNS_config_1.png)
+
+```bash
+$ cat /etc/hosts
+
+# Kubernetes-managed hosts file.
+127.0.0.1       localhost
+::1     localhost ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+fe00::0 ip6-mcastprefix
+fe00::1 ip6-allnodes
+fe00::2 ip6-allrouters
+192.168.121.203 ubuntu-host
+
+# Entries added by HostAliases.
+10.0.0.6        docker-registry-mirror.kodekloud.com
+```
+
+When, the hosts file gets bigger and the list gets biggers, this is when we use the DNS server. We push all the hosts and its IP address to the DNS server and point all our `servers` in the network to the DNS server.
+
+```bash
+$ cat /etc/resolv.conf
+search ztp6ekkbov7cfqmv.svc.cluster.local svc.cluster.local cluster.local us-central1-a.c.kk-lab-prod.internal c.kk-lab-prod.internal google.internal
+nameserver 10.96.0.10
+options ndots:5
+```
+
+```mermaid
+sequenceDiagram
+participant User Request(Terminal)
+participant Server A
+participant /etc/hosts
+participant /etc/resolv.conf
+participant DNS Server
+
+User Request(Terminal)->>Server A: Request `$ ping db`
+Server A->>/etc/hosts: Check for db(hostname) /etc/hosts file
+alt Hostname found (169.29.2.4 db)
+    /etc/hosts-->>Server A: Return IP address and response
+else Hostname not found (no entries of db in /etc/hosts)
+    /etc/hosts->>/etc/resolv.conf: Refer to public nameserver 0.0.0.0 or private nameserver 182.27.23.5
+    /etc/resolv.conf->>DNS Server: Query DNS server for hostname & IP
+    DNS Server-->>/etc/resolv.conf: Return IP address and response
+    /etc/resolv.conf-->>Server A: Forward IP address and response
+end
+Server A-->>User Request(Terminal): Respond with IP address and response
+```
+
+```bash
+# Order at which the DNS name resolution takes place
+$ cat /etc/nsswitch.conf 
+# /etc/nsswitch.conf
+#
+# Example configuration of GNU Name Service Switch functionality.
+# If you have the `glibc-doc-reference' and `info' packages installed, try:
+# `info libc "Name Service Switch"' for information about this file.
+
+passwd:         files
+group:          files
+shadow:         files
+gshadow:        files
+
+hosts:          files dns
+networks:       files
+
+protocols:      db files
+services:       db files
+ethers:         db files
+rpc:            db files
+
+netgroup:       nis
+```
+
+![networking_DNS_config_2.png](networking_DNS_config_2.png)
+
+Where, the Record:
+```
+A Record -> IPv4 address
+AAAA Record -> IPv6 address
+CNAME Record -> other names i.e. name-to-name mapping
+```
+
+##### Command Used:
+
+```bash
+# Query the DNS Servers, and will NOT be useful when it is a private network or do not query the /etc/hosts file.
+$ nslookup google.com
+Server:         10.96.0.10
+Address:        10.96.0.10#53
+
+Non-authoritative answer:
+Name:   google.com
+Address: 64.233.179.113
+Name:   google.com
+Address: 64.233.179.100
+Name:   google.com
+Address: 64.233.179.101
+Name:   google.com
+Address: 64.233.179.138
+Name:   google.com
+Address: 64.233.179.139
+Name:   google.com
+Address: 64.233.179.102
+Name:   google.com
+Address: 2607:f8b0:4001:c1d::66
+Name:   google.com
+Address: 2607:f8b0:4001:c1d::65
+Name:   google.com
+Address: 2607:f8b0:4001:c1d::8b
+Name:   google.com
+Address: 2607:f8b0:4001:c1d::8a
+
+# dig is more detailed that nslookup command
+$ dig google.com
+
+; <<>> DiG 9.18.1-1ubuntu1.3-Ubuntu <<>> google.com
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 9032
+;; flags: qr rd ra; QUERY: 1, ANSWER: 6, AUTHORITY: 0, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 1232
+; COOKIE: bd2e828ba6ac71bf (echoed)
+;; QUESTION SECTION:
+;google.com.                    IN      A
+
+;; ANSWER SECTION:
+google.com.             30      IN      A       142.251.184.102
+google.com.             30      IN      A       142.251.184.138
+google.com.             30      IN      A       142.251.184.139
+google.com.             30      IN      A       142.251.184.113
+google.com.             30      IN      A       142.251.184.101
+google.com.             30      IN      A       142.251.184.100
+
+;; Query time: 4 msec
+;; SERVER: 10.96.0.10#53(10.96.0.10) (UDP)
+;; WHEN: Tue Jan 21 02:20:58 UTC 2025
+;; MSG SIZE  rcvd: 207
+```
