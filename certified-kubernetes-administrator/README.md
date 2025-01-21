@@ -6952,7 +6952,7 @@ spec:
     volumeMounts:
     - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
       name: kube-api-access-h8kx2
-      readOnly: true
+      readOnly: true  
   dnsPolicy: ClusterFirst
   enableServiceLinks: true
   nodeName: controlplane
@@ -7434,4 +7434,359 @@ spec:
 
 ![difference_in_storage_creation_replication_types](difference_in_storage_creation_replication_types.png)
 
+##### Commands Used:
+
+```bash
+kubectl get sc
+NAME                   PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+local-path (default)   rancher.io/local-path   Delete          WaitForFirstConsumer   false                  12m
+
+$ kubectl describe sc local-path 
+Name:                  local-path
+IsDefaultClass:        Yes
+Annotations:           defaultVolumeType=local,objectset.rio.cattle.io/applied=H4sIAAAAAAAA/4yRz47UMAyHXwX53JYpnamqSBxg0V4QEhJoObuJOzVN4ypxi0areXeUMqDhwJ9j8ov9xZ+fARd+ophYAhhIKhHPVE1dqlhebjUUMHFwYODTj+jBY0pQwEyKDhXBPAOGIIrKElI+Ohpw9fokfp3p82UhMODFoocCpP9KVhNpFVkqi6qeMokz4i+5fAsUy/M2gYGpSXfJVhcv3nNwr984J+GfLQLOv/5T3sb9r6K0oM2V09pTmS5JaYbipzCbrVQ5ioGUdnmcypuJco/BgMaV4FqAx5787upP3BHTCAbqrhmak21Pw9Db5tAe20MzHJuhPnUH19m2w1cOe3fMTX+bbEEd8+USZeO8XIpgIGKwI8UMuHtWQMwD8PxRPNsLGHhHnjRr2fYdvuXgOJw/iMuAL8j6KPGRY9IHCWmdKcL1ewAAAP//KQ1Ko0kCAAA,objectset.rio.cattle.io/id=,objectset.rio.cattle.io/owner-gvk=k3s.cattle.io/v1, Kind=Addon,objectset.rio.cattle.io/owner-name=local-storage,objectset.rio.cattle.io/owner-namespace=kube-system,storageclass.kubernetes.io/is-default-class=true
+Provisioner:           rancher.io/local-path
+Parameters:            <none>
+AllowVolumeExpansion:  <unset>
+MountOptions:          <none>
+ReclaimPolicy:         Delete
+VolumeBindingMode:     WaitForFirstConsumer
+Events:                <none>
+
+### Adding More Storage Classes:
+$ kubectl get sc
+NAME                        PROVISIONER                     RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+local-path (default)        rancher.io/local-path           Delete          WaitForFirstConsumer   false                  13m
+local-storage               kubernetes.io/no-provisioner    Delete          WaitForFirstConsumer   false                  7s
+portworx-io-priority-high   kubernetes.io/portworx-volume   Delete          Immediate              false                  7s
+```
+
+The `Storage Class` called `local-storage` makes use of `VolumeBindingMode` set to `WaitForFirstConsumer`. This will delay the binding and provisioning of a `PersistentVolume` until a Pod using the `PersistentVolumeClaim` is created.
+
+```bash
+$ kubectl get pod,pv,pvc,sc
+NAME        READY   STATUS    RESTARTS   AGE
+pod/nginx   1/1     Running   0          13s
+
+NAME                        CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM               STORAGECLASS    VOLUMEATTRIBUTESCLASS   REASON   AGE
+persistentvolume/local-pv   500Mi      RWO            Retain           Bound    default/local-pvc   local-storage   <unset>                          28m
+
+NAME                              STATUS   VOLUME     CAPACITY   ACCESS MODES   STORAGECLASS    VOLUMEATTRIBUTESCLASS   AGE
+persistentvolumeclaim/local-pvc   Bound    local-pv   500Mi      RWO            local-storage   <unset>                 18m
+
+NAME                                                    PROVISIONER                     RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+storageclass.storage.k8s.io/local-path (default)        rancher.io/local-path           Delete          WaitForFirstConsumer   false                  42m
+storageclass.storage.k8s.io/local-storage               kubernetes.io/no-provisioner    Delete          WaitForFirstConsumer   false                  28m
+storageclass.storage.k8s.io/portworx-io-priority-high   kubernetes.io/portworx-volume   Delete          Immediate              false                  28m
+
+### Creation of the Storage Class
+
+$ kubectl apply -f storage.yaml 
+storageclass.storage.k8s.io/delayed-volume-sc created
+
+$ kubectl get sc
+NAME                        PROVISIONER                     RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+delayed-volume-sc           kubernetes.io/no-provisioner    Delete          WaitForFirstConsumer   false                  4s
+local-path (default)        rancher.io/local-path           Delete          WaitForFirstConsumer   false                  51m
+local-storage               kubernetes.io/no-provisioner    Delete          WaitForFirstConsumer   false                  37m
+portworx-io-priority-high   kubernetes.io/portworx-volume   Delete          Immediate              false                  37m
+
+$ cat storage.yaml 
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: delayed-volume-sc
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+```
+
 ----
+
+kubectl describe pod webapp
+Name:             webapp
+Namespace:        default
+Priority:         0
+Service Account:  default
+Node:             controlplane/192.168.163.2
+Start Time:       Sun, 19 Jan 2025 23:56:02 +0000
+Labels:           <none>
+Annotations:      <none>
+Status:           Running
+IP:               172.17.0.4
+IPs:
+  IP:  172.17.0.4
+Containers:
+  event-simulator:
+    Container ID:   containerd://8a81b368d4a3b6043313e4ff2ee9e3a62c39cfc546e5c7296016926ac9cffe56
+    Image:          kodekloud/event-simulator
+    Image ID:       docker.io/kodekloud/event-simulator@sha256:1e3e9c72136bbc76c96dd98f29c04f298c3ae241c7d44e2bf70bcc209b030bf9
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Sun, 19 Jan 2025 23:56:05 +0000
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      LOG_HANDLERS:  file
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-whp7r (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-whp7r:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  37s   default-scheduler  Successfully assigned default/webapp to controlplane
+  Normal  Pulling    36s   kubelet            Pulling image "kodekloud/event-simulator"
+  Normal  Pulled     34s   kubelet            Successfully pulled image "kodekloud/event-simulator" in 1.989s (1.989s including waiting). Image size: 28855042 bytes.
+  Normal  Created    34s   kubelet            Created container event-simulator
+  Normal  Started    34s   kubelet            Started container event-simulator
+
+----------
+
+## :: Networking
+
+----------
+
+### Networking Basics: Prerequisite Switching, Routing, Gateways CNI in kubernetes
+
+
+#### Switching
+
+##### Gateway
+
+![networking_gateway](networking_gateway.png)
+
+```bash
+$ ip link
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+3: eth0@if6355: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1410 qdisc noqueue state UP mode DEFAULT group default 
+    link/ether ba:02:83:3d:92:e1 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+
+# This command displays the Kernel's Routing Table
+$ route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+default         169.254.1.1     0.0.0.0         UG    0      0        0 eth0
+169.254.1.1     0.0.0.0         255.255.255.255 UH    0      0        0 eth0
+
+If you notice the above, `default` tells us that from the gateway `169.254.1.1`, it will send all traffic to the router, it is either 0.0.0.0 or default. Usually, the default or 0.0.0.0 is used to reach the internet. But, if there is no default, then it is a private network routing table and you would need to add routing table config to reach the internet.
+
+# To add a route from `Server B` to `Server C`
+$ ip route add <destination_ip_address/subnet-range> via <gateway_address>
+
+# Example:
+$ ip route add 192.168.2.0/24 via 192.168.1.1
+
+# Where, the 192.168.1.1 is the gateway of the existing VM and it want's to reach the destination of the IP/subnet range: 192.168.2.0/24. and, it is the vice-versa for all other servers.
+
+```
+#### Default Gateway
+
+![networking_gateway_2](networking_gateway_2.png)
+
+```bash
+# added an IP route
+$ ip route add 192.168.2.0/24 via 169.254.1.1
+
+# Now, the routing table looks like:
+$ route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+default         169.254.1.1     0.0.0.0         UG    0      0        0 eth0
+169.254.1.1     0.0.0.0         255.255.255.255 UH    0      0        0 eth0
+192.168.2.0     169.254.1.1     255.255.255.0   UG    0      0        0 eth0
+
+Please note, here the `gateway` is `169.254.1.1`. Otherwise, it will throw an error -> Error: Nexthop has invalid gateway.
+```
+![networking_gateway_3](networking_gateway_3.png)
+
+>[!Important]
+> Having a gateway configured, will NOT just send the packets from one interface like `eth0` to `eth1` automatically so, we need to configure it manually by `ip_forward` so that, the packets from `server A` in `private network` can travel between `server B` as a gateway to reach the `server C` in a different network.
+
+```bash
+# Make sure to pass the packets from `server A` to `server C`, we need to add the below changes in the `server B`
+$ cat /proc/sys/net/ipv4/ip_forward
+0
+
+$ echo 1 > /proc/sys/net/ipv4/ip_forward
+1
+
+# To persist the changes across reboots, update the below file
+$ /etc/sysctl.conf
+...
+net.ipv4.ip_forward = 1
+...
+```
+
+##### Commands Used:
+
+```bash
+$ ip link
+$ ip addr
+$ ip addr add 192.168.1.10/24 dev eth0
+$ ip route or route
+$ ip route add 192.168.1.0/24 via 192.168.2.1
+$ cat /proc/sys/net/ipv4/ip_forward
+```
+
+----
+
+### DNS Configuration
+
+![networking_DNS_config_1](networking_DNS_config_1.png)
+
+```bash
+$ cat /etc/hosts
+
+# Kubernetes-managed hosts file.
+127.0.0.1       localhost
+::1     localhost ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+fe00::0 ip6-mcastprefix
+fe00::1 ip6-allnodes
+fe00::2 ip6-allrouters
+192.168.121.203 ubuntu-host
+
+# Entries added by HostAliases.
+10.0.0.6        docker-registry-mirror.kodekloud.com
+```
+
+When, the hosts file gets bigger and the list gets biggers, this is when we use the DNS server. We push all the hosts and its IP address to the DNS server and point all our `servers` in the network to the DNS server.
+
+```bash
+$ cat /etc/resolv.conf
+search ztp6ekkbov7cfqmv.svc.cluster.local svc.cluster.local cluster.local us-central1-a.c.kk-lab-prod.internal c.kk-lab-prod.internal google.internal
+nameserver 10.96.0.10
+options ndots:5
+```
+
+```mermaid
+sequenceDiagram
+participant User Request(Terminal)
+participant Server A
+participant /etc/hosts
+participant /etc/resolv.conf
+participant DNS Server
+
+User Request(Terminal)->>Server A: Request `$ ping db`
+Server A->>/etc/hosts: Check for db(hostname) /etc/hosts file
+alt Hostname found (169.29.2.4 db)
+    /etc/hosts-->>Server A: Return IP address and response
+else Hostname not found (no entries of db in /etc/hosts)
+    /etc/hosts->>/etc/resolv.conf: Refer to public nameserver 0.0.0.0 or private nameserver 182.27.23.5
+    /etc/resolv.conf->>DNS Server: Query DNS server for hostname & IP
+    DNS Server-->>/etc/resolv.conf: Return IP address and response
+    /etc/resolv.conf-->>Server A: Forward IP address and response
+end
+Server A-->>User Request(Terminal): Respond with IP address and response
+```
+
+```bash
+# Order at which the DNS name resolution takes place
+$ cat /etc/nsswitch.conf 
+# /etc/nsswitch.conf
+#
+# Example configuration of GNU Name Service Switch functionality.
+# If you have the `glibc-doc-reference' and `info' packages installed, try:
+# `info libc "Name Service Switch"' for information about this file.
+
+passwd:         files
+group:          files
+shadow:         files
+gshadow:        files
+
+hosts:          files dns
+networks:       files
+
+protocols:      db files
+services:       db files
+ethers:         db files
+rpc:            db files
+
+netgroup:       nis
+```
+
+![networking_DNS_config_2.png](networking_DNS_config_2.png)
+
+Where, the Record:
+```
+A Record -> IPv4 address
+AAAA Record -> IPv6 address
+CNAME Record -> other names i.e. name-to-name mapping
+```
+
+##### Command Used:
+
+```bash
+# Query the DNS Servers, and will NOT be useful when it is a private network or do not query the /etc/hosts file.
+$ nslookup google.com
+Server:         10.96.0.10
+Address:        10.96.0.10#53
+
+Non-authoritative answer:
+Name:   google.com
+Address: 64.233.179.113
+Name:   google.com
+Address: 64.233.179.100
+Name:   google.com
+Address: 64.233.179.101
+Name:   google.com
+Address: 64.233.179.138
+Name:   google.com
+Address: 64.233.179.139
+Name:   google.com
+Address: 64.233.179.102
+Name:   google.com
+Address: 2607:f8b0:4001:c1d::66
+Name:   google.com
+Address: 2607:f8b0:4001:c1d::65
+Name:   google.com
+Address: 2607:f8b0:4001:c1d::8b
+Name:   google.com
+Address: 2607:f8b0:4001:c1d::8a
+
+# dig is more detailed that nslookup command
+$ dig google.com
+
+; <<>> DiG 9.18.1-1ubuntu1.3-Ubuntu <<>> google.com
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 9032
+;; flags: qr rd ra; QUERY: 1, ANSWER: 6, AUTHORITY: 0, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 1232
+; COOKIE: bd2e828ba6ac71bf (echoed)
+;; QUESTION SECTION:
+;google.com.                    IN      A
+
+;; ANSWER SECTION:
+google.com.             30      IN      A       142.251.184.102
+google.com.             30      IN      A       142.251.184.138
+google.com.             30      IN      A       142.251.184.139
+google.com.             30      IN      A       142.251.184.113
+google.com.             30      IN      A       142.251.184.101
+google.com.             30      IN      A       142.251.184.100
+
+;; Query time: 4 msec
+;; SERVER: 10.96.0.10#53(10.96.0.10) (UDP)
+;; WHEN: Tue Jan 21 02:20:58 UTC 2025
+;; MSG SIZE  rcvd: 207
+```
