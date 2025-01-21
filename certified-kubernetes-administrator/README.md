@@ -7501,3 +7501,152 @@ volumeBindingMode: WaitForFirstConsumer
 ```
 
 ----
+
+kubectl describe pod webapp
+Name:             webapp
+Namespace:        default
+Priority:         0
+Service Account:  default
+Node:             controlplane/192.168.163.2
+Start Time:       Sun, 19 Jan 2025 23:56:02 +0000
+Labels:           <none>
+Annotations:      <none>
+Status:           Running
+IP:               172.17.0.4
+IPs:
+  IP:  172.17.0.4
+Containers:
+  event-simulator:
+    Container ID:   containerd://8a81b368d4a3b6043313e4ff2ee9e3a62c39cfc546e5c7296016926ac9cffe56
+    Image:          kodekloud/event-simulator
+    Image ID:       docker.io/kodekloud/event-simulator@sha256:1e3e9c72136bbc76c96dd98f29c04f298c3ae241c7d44e2bf70bcc209b030bf9
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Sun, 19 Jan 2025 23:56:05 +0000
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      LOG_HANDLERS:  file
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-whp7r (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-whp7r:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  37s   default-scheduler  Successfully assigned default/webapp to controlplane
+  Normal  Pulling    36s   kubelet            Pulling image "kodekloud/event-simulator"
+  Normal  Pulled     34s   kubelet            Successfully pulled image "kodekloud/event-simulator" in 1.989s (1.989s including waiting). Image size: 28855042 bytes.
+  Normal  Created    34s   kubelet            Created container event-simulator
+  Normal  Started    34s   kubelet            Started container event-simulator
+
+----------
+
+## :: Networking
+
+----------
+
+### Networking Basics: Prerequisite Switching, Routing, Gateways CNI in kubernetes
+
+
+#### Switching
+
+##### Gateway
+
+![networking_gateway](networking_gateway.png)
+
+```bash
+$ ip link
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+3: eth0@if6355: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1410 qdisc noqueue state UP mode DEFAULT group default 
+    link/ether ba:02:83:3d:92:e1 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+
+# This command displays the Kernel's Routing Table
+$ route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+default         169.254.1.1     0.0.0.0         UG    0      0        0 eth0
+169.254.1.1     0.0.0.0         255.255.255.255 UH    0      0        0 eth0
+
+If you notice the above, `default` tells us that from the gateway `169.254.1.1`, it will send all traffic to the router, it is either 0.0.0.0 or default. Usually, the default or 0.0.0.0 is used to reach the internet. But, if there is no default, then it is a private network routing table and you would need to add routing table config to reach the internet.
+
+# To add a route from `Server B` to `Server C`
+$ ip route add <destination_ip_address/subnet-range> via <gateway_address>
+
+# Example:
+$ ip route add 192.168.2.0/24 via 192.168.1.1
+
+# Where, the 192.168.1.1 is the gateway of the existing VM and it want's to reach the destination of the IP/subnet range: 192.168.2.0/24. and, it is the vice-versa for all other servers.
+
+```
+#### Default Gateway
+
+![networking_gateway_2](networking_gateway_2.png)
+
+```bash
+# added an IP route
+$ ip route add 192.168.2.0/24 via 169.254.1.1
+
+# Now, the routing table looks like:
+$ route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+default         169.254.1.1     0.0.0.0         UG    0      0        0 eth0
+169.254.1.1     0.0.0.0         255.255.255.255 UH    0      0        0 eth0
+192.168.2.0     169.254.1.1     255.255.255.0   UG    0      0        0 eth0
+
+Please note, here the `gateway` is `169.254.1.1`. Otherwise, it will throw an error -> Error: Nexthop has invalid gateway.
+```
+![networking_gateway_3](networking_gateway_3.png)
+
+>[!Important]
+> Having a gateway configured, will NOT just send the packets from one interface like `eth0` to `eth1` automatically so, we need to configure it manually by `ip_forward` so that, the packets from `server A` in `private network` can travel between `server B` as a gateway to reach the `server C` in a different network.
+
+```bash
+# Make sure to pass the packets from `server A` to `server C`, we need to add the below changes in the `server B`
+$ cat /proc/sys/net/ipv4/ip_forward
+0
+
+$ echo 1 > /proc/sys/net/ipv4/ip_forward
+1
+
+# To persist the changes across reboots, update the below file
+$ /etc/sysctl.conf
+...
+net.ipv4.ip_forward = 1
+...
+```
+
+##### Commands Used:
+
+```bash
+$ ip link
+$ ip addr
+$ ip addr add 192.168.1.10/24 dev eth0
+$ ip route or route
+$ ip route add 192.168.1.0/24 via 192.168.2.1
+$ cat /proc/sys/net/ipv4/ip_forward
+```
+
+----
+
+### DNS Configuration
+
