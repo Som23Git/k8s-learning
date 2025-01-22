@@ -7801,21 +7801,21 @@ In the previous lecture, we saw why you need a DNS server, how it can help manag
 
 We are given a server dedicated as the DNS server and a set of IPs to configure as entries in the server. There are many DNS server solutions out there; in this lecture, we will focus on a particular one – CoreDNS.
 
-So, how do you get core DNS? CoreDNS binaries can be downloaded from their Github releases page or as a docker image. Let’s go the traditional route. Download the binary using curl or wget. And extract it. You get the coredns executable.
+So, how do you get **core DNS**? CoreDNS binaries can be downloaded from their Github releases page or as a docker image. Let’s go the traditional route. Download the binary using curl or wget. And extract it. You get the coredns executable.
 
 ![installation of coredns](coredns_1.png)
 
-Run the executable to start a DNS server. It, by default, listens on port 53, which is the default port for a DNS server.
+* Run the executable to start a DNS server. It, by default, listens on `port 53`, which is the default port for a DNS server.
 
-Now, we haven’t specified the IP to hostname mappings. For that, you need to provide some configurations. There are multiple ways to do that. We will look at one.
+* Now, we haven’t specified the IP to hostname mappings. For that, you need to provide some configurations. There are multiple ways to do that. We will look at one.
 
-First, we put all of the entries into the DNS servers /etc/hosts file. Then, we configure CoreDNS to use that file. CoreDNS loads its configuration from a file named Corefile.
+* First, we put all of the entries into the DNS servers /etc/hosts file. Then, we configure CoreDNS to use that file. CoreDNS loads its configuration from a file named Corefile.
 
-Here is a simple configuration that instructs CoreDNS to fetch the IP to hostname mappings from the file /etc/hosts. When the DNS server is run, it now picks the IPs and names from the /etc/hosts file on the server.
+Here is a `simple configuration` that instructs **CoreDNS** to fetch the IP to hostname mappings from the file `/etc/hosts`. When the DNS server is run, it now picks the IPs and names from the /etc/hosts file on the server.
 
 ![configuring IP names](coredns_2.png)
 
-CoreDNS also supports other ways of configuring DNS entries through plugins. We will look at the plugin that it uses for Kubernetes in a later section.
+**CoreDNS** also supports other ways of configuring DNS entries through plugins. We will look at the plugin that it uses for Kubernetes in a later section.
 
 Read more about `CoreDNS` here:
 
