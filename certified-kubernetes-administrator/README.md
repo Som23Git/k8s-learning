@@ -7824,3 +7824,282 @@ Read more about `CoreDNS` here:
 
 -----
 
+### Network Namespaces
+
+```bash
+$ ip netns add red
+
+$ ip netns add blue
+
+$ ip netns
+blue
+red
+cni-78909532-a9bb-7431-f0f5-a88282c6a7e9 (id: 2)
+cni-e7297641-1074-288e-3b31-c16d1527fab5 (id: 1)
+
+$ ip link
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+3: eth0@if7767: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1410 qdisc noqueue state UP mode DEFAULT group default 
+    link/ether e2:66:e5:28:81:05 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+4: flannel.1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1360 qdisc noqueue state UNKNOWN mode DEFAULT group default 
+    link/ether fe:69:40:36:84:ad brd ff:ff:ff:ff:ff:ff
+5: cni0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1360 qdisc noqueue state UP mode DEFAULT group default qlen 1000
+    link/ether ce:67:ca:c2:f0:9e brd ff:ff:ff:ff:ff:ff
+6: veth21def229@if2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1360 qdisc noqueue master cni0 state UP mode DEFAULT group default qlen 1000
+    link/ether c2:2c:6e:e3:1a:25 brd ff:ff:ff:ff:ff:ff link-netns cni-e7297641-1074-288e-3b31-c16d1527fab5
+7: veth936a0bd9@if2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1360 qdisc noqueue master cni0 state UP mode DEFAULT group default qlen 1000
+    link/ether c2:00:59:e6:57:e4 brd ff:ff:ff:ff:ff:ff link-netns cni-78909532-a9bb-7431-f0f5-a88282c6a7e9
+
+$ ip netns exec red ip link 
+1: lo: <LOOPBACK> mtu 65536 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+
+$ ip -n red link
+1: lo: <LOOPBACK> mtu 65536 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+
+$ arp
+Address                  HWtype  HWaddress           Flags Mask            Iface
+169.254.1.1              ether   ee:ee:ee:ee:ee:ee   C                     eth0
+172.17.2.0               ether   f6:54:f8:d0:9a:6b   CM                    flannel.1
+172.17.0.2               ether   fa:df:b5:0e:c4:9b   C                     cni0
+172.17.1.0               ether   1a:74:93:25:24:8a   CM                    flannel.1
+172.17.0.3               ether   ca:ff:32:f1:83:81   C                     cni0
+
+$ route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+default         169.254.1.1     0.0.0.0         UG    0      0        0 eth0
+169.254.1.1     0.0.0.0         255.255.255.255 UH    0      0        0 eth0
+172.17.0.0      0.0.0.0         255.255.255.0   U     0      0        0 cni0
+172.17.1.0      172.17.1.0      255.255.255.0   UG    0      0        0 flannel.1
+172.17.2.0      172.17.2.0      255.255.255.0   UG    0      0        0 flannel.1
+
+
+##### Inside the namespaces:
+
+$ ip netns exec red arp
+
+$ ip netns exec red route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+
+$ ip link add veth-red type veth peer name veth-blue
+
+### Important Step, make use of the subnet /24 instead of /32
+$ ip netns exec red ip addr add 192.168.15.1/24 dev veth-red
+
+$ ip netns exec blue ip addr add 192.168.15.2/24 dev veth-blue
+
+$ ip netns exec red ping 192.168.15.1
+PING 192.168.15.1 (192.168.15.1) 56(84) bytes of data.
+
+--- 192.168.15.1 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss, time 2026ms
+
+
+$ ip netns exec red ping 192.168.15.2
+PING 192.168.15.2 (192.168.15.2) 56(84) bytes of data.
+64 bytes from 192.168.15.2: icmp_seq=1 ttl=64 time=0.051 ms
+64 bytes from 192.168.15.2: icmp_seq=2 ttl=64 time=0.025 ms
+64 bytes from 192.168.15.2: icmp_seq=3 ttl=64 time=0.027 ms
+64 bytes from 192.168.15.2: icmp_seq=4 ttl=64 time=0.040 ms
+
+--- 192.168.15.2 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3056ms
+rtt min/avg/max/mdev = 0.025/0.035/0.051/0.010 ms
+
+
+$ ip netns exec blue ping 192.168.15.1
+PING 192.168.15.1 (192.168.15.1) 56(84) bytes of data.
+64 bytes from 192.168.15.1: icmp_seq=1 ttl=64 time=0.046 ms
+64 bytes from 192.168.15.1: icmp_seq=2 ttl=64 time=0.027 ms
+64 bytes from 192.168.15.1: icmp_seq=3 ttl=64 time=0.029 ms
+
+--- 192.168.15.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2030ms
+rtt min/avg/max/mdev = 0.027/0.034/0.046/0.008 ms
+
+$ ip netns exec red arp
+Address                  HWtype  HWaddress           Flags Mask            Iface
+192.168.15.2             ether   1a:b6:8f:68:38:6b   C                     veth-red
+
+$ ip netns exec blue arp
+Address                  HWtype  HWaddress           Flags Mask            Iface
+192.168.15.1             ether   d2:85:a6:21:b2:a7   C                     veth-blue
+
+$ ip netns exec blue route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+192.168.15.0    0.0.0.0         255.255.255.0   U     0      0        0 veth-blue
+
+$ ip netns exec red route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+192.168.15.0    0.0.0.0         255.255.255.0   U     0      0        0 veth-red
+```
+
+Adding more network namespaces, it is impossible to add `peers` to one-by-one so, we can use `Switch` i.e. `Virtual Switch`.
+
+```bash
+$ ip link add v-net-0 type bridge
+
+$ ip link
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+3: eth0@if7767: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1410 qdisc noqueue state UP mode DEFAULT group default 
+    link/ether e2:66:e5:28:81:05 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+4: flannel.1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1360 qdisc noqueue state UNKNOWN mode DEFAULT group default 
+    link/ether fe:69:40:36:84:ad brd ff:ff:ff:ff:ff:ff
+5: cni0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1360 qdisc noqueue state UP mode DEFAULT group default qlen 1000
+    link/ether ce:67:ca:c2:f0:9e brd ff:ff:ff:ff:ff:ff
+6: veth21def229@if2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1360 qdisc noqueue master cni0 state UP mode DEFAULT group default qlen 1000
+    link/ether c2:2c:6e:e3:1a:25 brd ff:ff:ff:ff:ff:ff link-netns cni-e7297641-1074-288e-3b31-c16d1527fab5
+7: veth936a0bd9@if2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1360 qdisc noqueue master cni0 state UP mode DEFAULT group default qlen 1000
+    link/ether c2:00:59:e6:57:e4 brd ff:ff:ff:ff:ff:ff link-netns cni-78909532-a9bb-7431-f0f5-a88282c6a7e9
+
+### Virtual Switch ###
+10: v-net-0: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/ether e2:eb:fa:12:d3:46 brd ff:ff:ff:ff:ff:ff
+
+$ ip link set dev v-net-0 up
+
+---
+
+# Delete the veth interfaces so we can attach it to the bridge i.e. Virtual Switch created above:
+
+$ ip -n red link del veth-red
+
+```
+
+>[!Important]
+> Please note, whenever you delete one-peer, it will automatically deletes the other as well. In this scenario, once you perform the `dev veth-red` it will delete the `veth-blue` as well.
+
+#### Linux Bridge
+
+As we have a switch in place, we can connect all the network namespaces interfaces to the bridge so, it can connect to all.
+
+```bash
+### Create the cables from the network namespaces to the bridge network
+$ ip link add veth-red type veth peer name veth-red-br
+
+$ ip link add veth-blue type veth peer name veth-blu-br
+
+### Attach the network namespaces and the other end to the bridge network
+
+-----
+
+# Let's add it for the red namespace
+$ ip link set veth-red netns red
+
+# Quick check:
+$ ip netns exec red ip link
+1: lo: <LOOPBACK> mtu 65536 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+12: veth-red@if11: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/ether be:26:41:9b:fb:88 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+
+# Let's add it for the bridge as the master
+$ ip link set veth-red-br master v-net-0
+
+----- 
+
+# Let's follow the same for the blue namespace
+$ ip link set veth-blue netns blue
+
+# Quick check:
+$ ip netns exec blue ip link
+1: lo: <LOOPBACK> mtu 65536 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+14: veth-blue@if13: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/ether 12:3c:ef:61:62:37 brd ff:ff:ff:ff:ff:ff link-netnsid 1
+
+# Let's add it for the bridge as the master
+$ ip link set veth-blue-br master v-net-0
+
+------
+
+# Finally, let's add the unique IP address to those network namespaces
+
+$ ip -n red addr add 192.168.15.1/24 dev veth-red; ip -n blue addr add 192.168.15.2/24 dev veth-blue
+
+$ ip netns exec blue ip addr; ip netns exec red ip addr
+1: lo: <LOOPBACK> mtu 65536 qdisc noop state DOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+14: veth-blue@if13: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state LOWERLAYERDOWN group default qlen 1000
+    link/ether 12:3c:ef:61:62:37 brd ff:ff:ff:ff:ff:ff link-netnsid 1
+    inet 192.168.15.2/24 scope global veth-blue
+       valid_lft forever preferred_lft forever
+1: lo: <LOOPBACK> mtu 65536 qdisc noop state DOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+12: veth-red@if11: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state LOWERLAYERDOWN group default qlen 1000
+    link/ether be:26:41:9b:fb:88 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 192.168.15.1/24 scope global veth-red
+       valid_lft forever preferred_lft forever
+
+# Another method:
+$ ip netns exec red ip addr | grep inet; ip netns exec blue ip addr | grep inet
+    inet 192.168.15.1/24 scope global veth-red
+    inet 192.168.15.2/24 scope global veth-blue
+
+--- 
+
+# Now, let's start the veth interface
+
+$ ip -n red link set veth-red up
+
+$ ip -n blue link set veth-blue up
+
+# Let's try to ping the blue network namespace from the red network namespace:
+
+controlplane ~ ➜  ip netns exec red ping 192.168.15.2
+PING 192.168.15.2 (192.168.15.2) 56(84) bytes of data.
+^C
+--- 192.168.15.2 ping statistics ---
+5 packets transmitted, 0 received, 100% packet loss, time 4107ms
+
+## Seems like it did not work, let's see whether the switches/bridge are activated or UP.
+
+$ bridge link show
+6: veth21def229@if2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1360 master cni0 state forwarding priority 32 cost 2 
+7: veth936a0bd9@if2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1360 master cni0 state forwarding priority 32 cost 2 
+11: veth-red-br@if12: <BROADCAST,MULTICAST> mtu 1500 master v-net-0 state disabled priority 32 cost 2 
+13: veth-blu-br@if14: <BROADCAST,MULTICAST> mtu 1500 master v-net-0 state disabled priority 32 cost 2 
+
+$ bridge link show master v-net-0
+6: veth21def229@if2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1360 master cni0 state forwarding priority 32 cost 2 
+7: veth936a0bd9@if2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1360 master cni0 state forwarding priority 32 cost 2 
+11: veth-red-br@if12: <BROADCAST,MULTICAST> mtu 1500 master v-net-0 state disabled priority 32 cost 2 
+13: veth-blu-br@if14: <BROADCAST,MULTICAST> mtu 1500 master v-net-0 state disabled priority 32 cost 2 
+
+$ ip link set veth-red-br up; ip link set veth-blu-br up
+
+$ bridge link show master v-net-0
+6: veth21def229@if2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1360 master cni0 state forwarding priority 32 cost 2 
+7: veth936a0bd9@if2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1360 master cni0 state forwarding priority 32 cost 2 
+11: veth-red-br@if12: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 master v-net-0 state forwarding priority 32 cost 2 
+13: veth-blu-br@if14: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 master v-net-0 state forwarding priority 32 cost 2 
+
+$ ip link set v-net-0 up
+
+$ bridge link show
+6: veth21def229@if2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1360 master cni0 state forwarding priority 32 cost 2 
+7: veth936a0bd9@if2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1360 master cni0 state forwarding priority 32 cost 2 
+11: veth-red-br@if12: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 master v-net-0 state forwarding priority 32 cost 2 
+13: veth-blu-br@if14: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 master v-net-0 state forwarding priority 32 cost 2
+
+# Now, all the interfaces are UP and FORWARDING
+
+# Let's try to reach the blue network namespace again:
+
+$ ip netns exec red ping 192.168.15.2
+PING 192.168.15.2 (192.168.15.2) 56(84) bytes of data.
+64 bytes from 192.168.15.2: icmp_seq=1 ttl=64 time=0.100 ms
+64 bytes from 192.168.15.2: icmp_seq=2 ttl=64 time=0.050 ms
+64 bytes from 192.168.15.2: icmp_seq=3 ttl=64 time=0.050 ms
+
+--- 192.168.15.2 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2034ms
+rtt min/avg/max/mdev = 0.050/0.066/0.100/0.023 ms
+```
