@@ -8897,13 +8897,11 @@ Two CNI plugins who'll manages IP address:
 - host-local
 
 ```bash
-cat /etc/cni/net.d/net-script.conf
+$ cat /etc/cni/net.d/net-script.conf
 
-Weavenet can be set within the IPs:
+# Weavenet can be set within the IPs: 10.32.0.0./12 -> 10.32.0.1 > 10.47.266.254
 
-10.32.0.0./12 -> 10.32.0.1 > 10.47.266.254
-
-ip link
+$ ip link
 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
 2: datapath: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1376 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
@@ -8950,4 +8948,118 @@ $ cat /var/log/kube-proxy.log
 
 ------
 
+##### Questions & Commands Used:
+
+<details><summary>Q1: What network range are the nodes in the cluster part of?</summary>
+
+```bash
+$ kubectl get nodes -o wide
+NAME           STATUS   ROLES           AGE   VERSION   INTERNAL-IP   EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION   CONTAINER-RUNTIME
+controlplane   Ready    control-plane   27m   v1.31.0   192.11.78.6   <none>        Ubuntu 22.04.4 LTS   5.4.0-1106-gcp   containerd://1.6.26
+node01         Ready    <none>          26m   v1.31.0   192.11.78.9   <none>        Ubuntu 22.04.4 LTS   5.4.0-1106-gcp   containerd://1.6.26
+```
+
+Seems like the nodes are part of the network range: `192.11.78.0/24`
+
+</details>
+
+<details><summary>Q2: What is the range of IP addresses configured for PODs on this cluster?</summary>
+
+To understand this, let create a new pod and check the IP address:
+```bash
+$ kubectl run nginx --image=nginx
+pod/nginx created
+
+$ kubectl get pods -o wide
+NAME    READY   STATUS              RESTARTS   AGE   IP       NODE     NOMINATED NODE   READINESS GATES
+nginx   0/1     ContainerCreating   0          5s    <none>   node01   <none>           <none>
+
+$ kubectl get pods -o wide
+NAME    READY   STATUS    RESTARTS   AGE   IP             NODE     NOMINATED NODE   READINESS GATES
+nginx   1/1     Running   0          8s    10.244.192.1   node01   <none>           <none>
+```
+
+Seems like the pods are part of the network range: `10.244.192.0/24` or `10.244.0.0/16`
+
+</details>
+
+
+<details><summary>Q3: What is the IP Range configured for the services within the cluster?</summary>
+
+To understand this, let's check the kube-apiserver where it passes: `--service-cluster-ip-range=10.96.0.0/12`
+
+```bash
+$ ps -aux | grep -i "kube-apiserver"
+root        3648  0.0  0.1 1525984 284272 ?      Ssl  12:51   1:24 kube-apiserver --advertise-address=192.10.197.12 --allow-privileged=true --authorization-mode=Node,RBAC --client-ca-file=/etc/kubernetes/pki/ca.crt --enable-admission-plugins=NodeRestriction --enable-bootstrap-token-auth=true --etcd-cafile=/etc/kubernetes/pki/etcd/ca.crt --etcd-certfile=/etc/kubernetes/pki/apiserver-etcd-client.crt --etcd-keyfile=/etc/kubernetes/pki/apiserver-etcd-client.key --etcd-servers=https://127.0.0.1:2379 --kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt --kubelet-client-key=/etc/kubernetes/pki/apiserver-kubelet-client.key --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname --proxy-client-cert-file=/etc/kubernetes/pki/front-proxy-client.crt --proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key --requestheader-allowed-names=front-proxy-client --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt --requestheader-extra-headers-prefix=X-Remote-Extra- --requestheader-group-headers=X-Remote-Group --requestheader-username-headers=X-Remote-User --secure-port=6443 --service-account-issuer=https://kubernetes.default.svc.cluster.local --service-account-key-file=/etc/kubernetes/pki/sa.pub --service-account-signing-key-file=/etc/kubernetes/pki/sa.key --service-cluster-ip-range=10.96.0.0/12 --tls-cert-file=/etc/kubernetes/pki/apiserver.crt --tls-private-key-file=/etc/kubernetes/pki/apiserver.key
+root       11079  0.0  0.0   6936  2232 pts/2    S+   13:35   0:00 grep --color=auto -i kube-apiserver
+```
+
+Seems like the services are part of the network range: `10.96.0.0/12`
+
+</details>
+
+<details><summary>Q4: How many kube-proxy pods are deployed in this cluster?</summary> 
+
+```bash
+$ kubectl get pods -A -o wide
+NAMESPACE     NAME                                   READY   STATUS    RESTARTS      AGE   IP            NODE           NOMINATED NODE   READINESS GATES
+kube-system   coredns-77d6fd4654-kc28n               1/1     Running   0             29m   10.244.0.3    controlplane   <none>           <none>
+kube-system   coredns-77d6fd4654-n6bvc               1/1     Running   0             29m   10.244.0.2    controlplane   <none>           <none>
+kube-system   etcd-controlplane                      1/1     Running   0             29m   192.11.78.6   controlplane   <none>           <none>
+kube-system   kube-apiserver-controlplane            1/1     Running   0             29m   192.11.78.6   controlplane   <none>           <none>
+kube-system   kube-controller-manager-controlplane   1/1     Running   0             29m   192.11.78.6   controlplane   <none>           <none>
+kube-system   kube-proxy-5knwl                       1/1     Running   0             29m   192.11.78.9   node01         <none>           <none>
+kube-system   kube-proxy-bxmt6                       1/1     Running   0             29m   192.11.78.6   controlplane   <none>           <none>
+kube-system   kube-scheduler-controlplane            1/1     Running   0             29m   192.11.78.6   controlplane   <none>           <none>
+kube-system   weave-net-cgvxb                        2/2     Running   0             29m   192.11.78.9   node01         <none>           <none>
+kube-system   weave-net-dbgkx                        2/2     Running   1 (29m ago)   29m   192.11.78.6   controlplane   <none>           <none>
+```
+
+There are two `kube-proxy pods` - `kube-proxy-5knwl and kube-proxy-bxmt6`
+
+</details>
+
+<details><summary>Q5: What `type` of proxy is the kube-proxy configured to use?</summary> 
+
+```bash
+kubectl logs pod/kube-proxy-5knwl -n kube-system
+I0124 12:52:20.968536       1 server_linux.go:66] "Using iptables proxy"
+I0124 12:52:21.140070       1 server.go:677] "Successfully retrieved node IP(s)" IPs=["192.10.197.3"]
+I0124 12:52:21.160761       1 conntrack.go:60] "Setting nf_conntrack_max" nfConntrackMax=1179648
+I0124 12:52:21.162817       1 conntrack.go:121] "Set sysctl" entry="net/netfilter/nf_conntrack_tcp_timeout_established" value=86400
+E0124 12:52:21.164320       1 server.go:234] "Kube-proxy configuration may be incomplete or incorrect" err="nodePortAddresses is unset; NodePort connections will be accepted on all local IPs. Consider using `--nodeport-addresses primary`"
+I0124 12:52:21.186680       1 server.go:243] "kube-proxy running in dual-stack mode" primary ipFamily="IPv4"
+I0124 12:52:21.186735       1 server_linux.go:169] "Using iptables Proxier"
+I0124 12:52:21.189087       1 proxier.go:255] "Setting route_localnet=1 to allow node-ports on localhost; to change this either disable iptables.localhostNodePorts (--iptables-localhost-nodeports) or set nodePortAddresses (--nodeport-addresses) to filter loopback addresses" ipFamily="IPv4"
+I0124 12:52:21.207947       1 server.go:483] "Version info" version="v1.31.0"
+I0124 12:52:21.207991       1 server.go:485] "Golang settings" GOGC="" GOMAXPROCS="" GOTRACEBACK=""
+I0124 12:52:21.211185       1 config.go:197] "Starting service config controller"
+I0124 12:52:21.211211       1 config.go:326] "Starting node config controller"
+I0124 12:52:21.211227       1 shared_informer.go:313] Waiting for caches to sync for node config
+I0124 12:52:21.211229       1 shared_informer.go:313] Waiting for caches to sync for service config
+I0124 12:52:21.211325       1 config.go:104] "Starting endpoint slice config controller"
+I0124 12:52:21.211340       1 shared_informer.go:313] Waiting for caches to sync for endpoint slice config
+I0124 12:52:21.311388       1 shared_informer.go:320] Caches are synced for node config
+I0124 12:52:21.311480       1 shared_informer.go:320] Caches are synced for endpoint slice config
+I0124 12:52:21.311574       1 shared_informer.go:320] Caches are synced for service config
+```
+
+From this logline: `Using iptables proxy` -> We could see that the kube-proxy is using the `iptables`.
+
+</details>
+
+<details><summary>Q5: How does this Kubernetes cluster ensure that a kube-proxy pod runs on all nodes in the cluster?</summary> 
+
+```bash
+$ kubectl get pod/kube-proxy-5knwl -n kube-system -o yaml | grep -i "kind"
+kind: Pod
+    kind: DaemonSet
+```
+
+Yes, it is deployed as `DaemonSets` across all the nodes.
+</details>
+
+-----
+
+### Cluster DNS
 
