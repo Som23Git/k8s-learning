@@ -8408,6 +8408,169 @@ $ ip address show type bridge
 
 -----
 
+### Pod Networking
 
 
+-----
 
+### CNI in Kubernetes 
+
+
+------
+
+>[!Warning]
+>Weave Net Installation method is updated:
+
+Important Update:
+
+Before going to the CNI weave lecture, we have an update for the Weave Net installation link. They have announced the end of service for Weave Cloud.
+
+To know more about this, read the blog from the link below: –
+
+https://www.weave.works/blog/weave-cloud-end-of-service
+
+As an impact, the old weave net installation link won’t work anymore: –
+
+```bash
+$ kubectl apply -f “https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d ‘\n’)”
+```
+
+Instead of that, use the latest link below to install the weave net: –
+
+```bash
+$ kubectl apply -f https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s.yaml
+```
+
+Reference links:
+
+https://www.weave.works/docs/net/latest/kubernetes/kube-addon/#-installation
+https://github.com/weaveworks/weave/releases
+
+-----
+
+### Weave Works - Weave CNI Plugin
+
+![weaveworks_agent_1](weaveworks_agent_1.png)
+
+#### Deploy Weave
+
+Can be deployed as `Services` or `DaemonSets`, or we can deploy it as `Pods`:
+
+```bash
+# Latest Installation binary to deploy Weavenet:
+
+$ kubectl apply -f https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s.yaml
+```
+
+```bash
+# To Troubleshoot the weave related issues:
+$ kubectl get pods -n kube-system
+
+$ kubectl logs weave-net-<id> weave -n kube-system
+```
+-----
+
+##### Commands Used:
+
+**How to find the config of the `kubelet service`?**
+
+```bash
+$ systemctl status kubelet 
+● kubelet.service - kubelet: The Kubernetes Node Agent
+     Loaded: loaded (/lib/systemd/system/kubelet.service; enabled; vendor preset: enabled)
+    Drop-In: /usr/lib/systemd/system/kubelet.service.d
+             └─10-kubeadm.conf
+     Active: active (running) since Fri 2025-01-24 04:56:02 UTC; 17min ago
+       Docs: https://kubernetes.io/docs/
+   Main PID: 4144 (kubelet)
+      Tasks: 23 (limit: 77143)
+     Memory: 42.3M
+     CGroup: /system.slice/kubelet.service
+             └─4144 /usr/bin/kubelet --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf --config=/var/lib/kubelet/config.yaml --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --pod-infra-container-image=registry.k8s.io/pause:3.10
+
+Jan 24 04:56:10 controlplane kubelet[4144]: E0124 04:56:10.478671    4144 log.go:32] "RunPodSandbox from runtime service failed" err="rpc error: code = Unknown desc = failed to setup network for sandbox \"593e62ae3de97ba7f64f64e8b3903ee8706950dba749f92b9cbe91fc7415ea3b\": plugin type=\"flannel\" failed (add): loadFlannelSubnetEnv failed: open /run/flannel/subnet.env: no such file or directory"
+Jan 24 04:56:10 controlplane kubelet[4144]: E0124 04:56:10.478719    4144 kuberuntime_sandbox.go:72] "Failed to create sandbox for pod" err="rpc error: code = Unknown desc = failed to setup network for sandbox \"593e62ae3de97ba7f64f64e8b3903ee8706950dba749f92b9cbe91fc7415ea3b\": plugin type=\"flannel\" failed (add): loadFlannelSubnetEnv failed: open /run/flannel/subnet.env: no such file or directory" pod="kube-system/coredns-77d6fd4654-ghwd2"
+Jan 24 04:56:10 controlplane kubelet[4144]: E0124 04:56:10.478739    4144 kuberuntime_manager.go:1168] "CreatePodSandbox for pod failed" err="rpc error: code = Unknown desc = failed to setup network for sandbox \"593e62ae3de97ba7f64f64e8b3903ee8706950dba749f92b9cbe91fc7415ea3b\": plugin type=\"flannel\" failed (add): loadFlannelSubnetEnv failed: open /run/flannel/subnet.env: no such file or directory" pod="kube-system/coredns-77d6fd4654-ghwd2"
+Jan 24 04:56:10 controlplane kubelet[4144]: E0124 04:56:10.478782    4144 pod_workers.go:1301] "Error syncing pod, skipping" err="failed to \"CreatePodSandbox\" for \"coredns-77d6fd4654-ghwd2_kube-system(382938d7-b72b-45ed-be37-7ea0ccef7e1b)\" with CreatePodSandboxError: \"Failed to create sandbox for pod \\\"coredns-77d6fd4654-ghwd2_kube-system(382938d7-b72b-45ed-be37-7ea0ccef7e1b)\\\": rpc error: code = Unknown desc = failed to setup network for sandbox \\\"593e62ae3de97ba7f64f64e8b3903ee8706950dba749f92b9cbe91fc7415ea3b\\\": plugin type=\\\"flannel\\\" failed (add): loadFlannelSubnetEnv failed: open /run/flannel/subnet.env: no such file or directory\"" pod="kube-system/coredns-77d6fd4654-ghwd2" podUID="382938d7-b72b-45ed-be37-7ea0ccef7e1b"
+Jan 24 04:56:11 controlplane kubelet[4144]: I0124 04:56:11.857913    4144 pod_startup_latency_tracker.go:104] "Observed pod startup duration" pod="kube-flannel/kube-flannel-ds-s5l4d" podStartSLOduration=4.857894787 podStartE2EDuration="4.857894787s" podCreationTimestamp="2025-01-24 04:56:07 +0000 UTC" firstStartedPulling="0001-01-01 00:00:00 +0000 UTC" lastFinishedPulling="0001-01-01 00:00:00 +0000 UTC" observedRunningTime="2025-01-24 04:56:11.857736072 +0000 UTC m=+9.173816404" watchObservedRunningTime="2025-01-24 04:56:11.857894787 +0000 UTC m=+9.173975117"
+Jan 24 04:56:25 controlplane kubelet[4144]: I0124 04:56:25.878677    4144 pod_startup_latency_tracker.go:104] "Observed pod startup duration" pod="kube-system/coredns-77d6fd4654-6txv9" podStartSLOduration=18.878401825 podStartE2EDuration="18.878401825s" podCreationTimestamp="2025-01-24 04:56:07 +0000 UTC" firstStartedPulling="0001-01-01 00:00:00 +0000 UTC" lastFinishedPulling="0001-01-01 00:00:00 +0000 UTC" observedRunningTime="2025-01-24 04:56:25.878106912 +0000 UTC m=+23.194187237" watchObservedRunningTime="2025-01-24 04:56:25.878401825 +0000 UTC m=+23.194482158"
+Jan 24 04:56:26 controlplane kubelet[4144]: I0124 04:56:26.893688    4144 pod_startup_latency_tracker.go:104] "Observed pod startup duration" pod="kube-system/coredns-77d6fd4654-ghwd2" podStartSLOduration=19.893648614 podStartE2EDuration="19.893648614s" podCreationTimestamp="2025-01-24 04:56:07 +0000 UTC" firstStartedPulling="0001-01-01 00:00:00 +0000 UTC" lastFinishedPulling="0001-01-01 00:00:00 +0000 UTC" observedRunningTime="2025-01-24 04:56:26.883350491 +0000 UTC m=+24.199430814" watchObservedRunningTime="2025-01-24 04:56:26.893648614 +0000 UTC m=+24.209728944"
+Jan 24 05:01:02 controlplane kubelet[4144]: E0124 05:01:02.841875    4144 info.go:104] Failed to get disk map: could not parse device numbers from  for device md127
+Jan 24 05:06:02 controlplane kubelet[4144]: E0124 05:06:02.842301    4144 info.go:104] Failed to get disk map: could not parse device numbers from  for device md127
+Jan 24 05:11:02 controlplane kubelet[4144]: E0124 05:11:02.842568    4144 info.go:104] Failed to get disk map: could not parse device numbers from  for device md127
+```
+
+**Or Alternative methods:**
+
+```bash
+$ ps -aux | grep -i kubelet | grep container-runtime
+```
+
+##### CNI Questions:
+
+<details><summary>Q1: What is the path configured with all binaries of CNI supported plugins?</summary>
+
+```bash
+$ /opt/cni/bin
+```
+</details>
+
+<details><summary>Q2: Identify which of the below plugins is not available in the list of available CNI plugins on this host?</summary>
+
+```bash
+$ ls  -ltrh /opt/cni/bin/
+total 82M
+4.0M -rwxr-xr-x 1 root root 4.0M Aug 29 21:33 vrf
+4.3M -rwxr-xr-x 1 root root 4.3M Aug 29 21:33 vlan
+3.7M -rwxr-xr-x 1 root root 3.7M Aug 29 21:33 tuning
+4.3M -rwxr-xr-x 1 root root 4.3M Aug 29 21:33 tap
+3.1M -rwxr-xr-x 1 root root 3.1M Aug 29 21:33 static
+4.0K -rw-r--r-- 1 root root 2.3K Aug 29 21:33 README.md
+4.4M -rwxr-xr-x 1 root root 4.4M Aug 29 21:33 ptp
+4.1M -rwxr-xr-x 1 root root 4.1M Aug 29 21:33 portmap
+3.6M -rwxr-xr-x 1 root root 3.6M Aug 29 21:33 loopback
+ 12K -rw-r--r-- 1 root root  12K Aug 29 21:33 LICENSE
+4.3M -rwxr-xr-x 1 root root 4.3M Aug 29 21:33 ipvlan
+3.6M -rwxr-xr-x 1 root root 3.6M Aug 29 21:33 host-local
+4.2M -rwxr-xr-x 1 root root 4.2M Aug 29 21:33 host-device
+4.8M -rwxr-xr-x 1 root root 4.8M Aug 29 21:33 firewall
+4.3M -rwxr-xr-x 1 root root 4.3M Aug 29 21:33 dummy
+ 11M -rwxr-xr-x 1 root root  11M Aug 29 21:33 dhcp
+4.6M -rwxr-xr-x 1 root root 4.6M Aug 29 21:33 bridge
+4.1M -rwxr-xr-x 1 root root 4.1M Aug 29 21:33 bandwidth
+3.8M -rwxr-xr-x 1 root root 3.8M Aug 29 21:33 sbr
+4.3M -rwxr-xr-x 1 root root 4.3M Aug 29 21:33 macvlan
+2.4M -rwxr-xr-x 1 root root 2.4M Jan 24 04:56 flannel
+```
+</details>
+
+<details><summary>Q3: What is the CNI plugin configured to be used on this kubernetes cluster?</summary>
+
+```bash
+/etc/cni/net.d ➜  cat 10-flannel.conflist 
+{
+  "name": "cbr0",
+  "cniVersion": "0.3.1",
+  "plugins": [
+    {
+      "type": "flannel",
+      "delegate": {
+        "hairpinMode": true,
+        "isDefaultGateway": true
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {
+        "portMappings": true
+      }
+    }
+  ]
+}
+```
+
+The answer is `Flannel` as the `isDefaultGateway` is set to `true`, whereas the `portmap` is for the port mappings.
+
+</details>
+
+------
