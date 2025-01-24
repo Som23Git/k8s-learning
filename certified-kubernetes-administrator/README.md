@@ -7984,9 +7984,15 @@ As we have a switch in place, we can connect all the network namespaces interfac
 ### Create the cables from the network namespaces to the bridge network
 $ ip link add veth-red type veth peer name veth-red-br
 
-$ ip link add veth-blue type veth peer name veth-blu-br
+$ ip link add veth-blue type veth peer name veth-blue-br
 
-### Attach the network namespaces and the other end to the bridge network
+### This above commands will attach the network namespaces and the other end to the bridge network
+
+# Let's create a bridge network
+$ ip link add v-net-0 type bridge
+
+# Let's switch it ON
+$ ip link set dev v-net-0 up
 
 -----
 
@@ -8103,3 +8109,149 @@ PING 192.168.15.2 (192.168.15.2) 56(84) bytes of data.
 3 packets transmitted, 3 received, 0% packet loss, time 2034ms
 rtt min/avg/max/mdev = 0.050/0.066/0.100/0.023 ms
 ```
+
+##### commands used
+
+```bash
+Commands:
+$ ip netns
+$ ip link
+$ ip addr
+
+# Step 1: Added a new red and blue network namespace
+
+$ ip netns add red; ip netns add blue
+
+# Step 2: Let's create that bridge network, i.e. Switch
+
+$ ip link add v-net-0 type bridge
+
+# Step 3: Let's create the cables and interfaces
+
+$ ip link add veth-red type veth peer name veth-red-br; ip link add veth-blue type veth peer name veth-blue-br
+
+Interfaces:
+veth-red => red
+veth-blue => blue
+veth-blue-br => bridge (port 1)
+veth-red-br => bridge (port 2)
+
+# Once adding the interfaces, i.e. the cables, let's set those cables to those interfaces:
+
+$ ip link set veth-blue netns blue; ip link set veth-red netns red
+
+$ ip link set veth-blue-br master v-net-0; ip link set veth-red-br master v-net-0
+
+# Step 4: Let's add those IP addresses:
+
+$ ip netns exec red ip addr add 192.168.15.1/24 dev veth-red;ip netns exec blue ip addr add 192.168.15.2/24 dev veth-blue
+
+# Step 5: Let's UP all the interfaces
+
+$ ip netns exec red ip link set veth-red up; ip netns exec blue ip link set veth-blue up
+$ ip link set veth-red-br up; ip link set veth-blue-br up
+$ ip link set dev v-net-0 up
+
+
+# Here, you see, the veth-red interface, is DOWN "state DOWN" and once we start UP the interfaces, you see the state is UP "state UP".
+
+$ ip netns exec red ip link
+1: lo: <LOOPBACK> mtu 65536 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+10: veth-red@if9: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/ether 9e:12:30:ef:55:70 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+
+$ ip netns exec red ip link
+1: lo: <LOOPBACK> mtu 65536 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+10: veth-red@if9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP mode DEFAULT group default qlen 1000
+    link/ether 9e:12:30:ef:55:70 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+```
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant RedNamespace
+    participant BlueNamespace
+    participant Bridge as Bridge (v-net-0)
+
+    User->>OS: Add "red" namespace
+    User->>OS: Add "blue" namespace
+
+    User->>OS: Create bridge network "v-net-0"
+
+    User->>OS: Create veth pair (veth-red, veth-red-br)
+    User->>OS: Create veth pair (veth-blue, veth-blue-br)
+
+    User->>RedNamespace: Assign veth-red to "red" namespace
+    User->>BlueNamespace: Assign veth-blue to "blue" namespace
+
+    User->>Bridge: Assign veth-red-br as port 1
+    User->>Bridge: Assign veth-blue-br as port 2
+
+    User->>RedNamespace: Assign IP 192.168.15.1/24 to veth-red
+    User->>BlueNamespace: Assign IP 192.168.15.2/24 to veth-blue
+
+    User->>RedNamespace: Bring veth-red UP
+    User->>BlueNamespace: Bring veth-blue UP
+
+    User->>Bridge: Bring veth-red-br UP
+    User->>Bridge: Bring veth-blue-br UP
+    User->>Bridge: Bring bridge "v-net-0" UP
+```
+
+### Internal to External Communication from the Network Namespaces
+
+Now, let's try to add an IP address to the `v-net-0` interface i.e. the `bridge` does not have an `IP address`:
+
+```bash
+$ ip addr add 192.168.15.5/24 dev v-net-0
+
+$ ip netns exec blue ip route add 192.168.1.0/24 via 192.168.15.5
+
+or
+$ ip netns exec blue ip route add 192.168.121.0/24 via 192.168.15.5
+
+or
+
+$ ip netns exec blue ip route add <host_ip_address>/24 via 192.168.15.5
+
+iptables -t nat -A POSTROUTING -s 192.168.15.0/24 -j MASQUERADE
+
+$ ip netns exec blue route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+192.168.15.0    0.0.0.0         255.255.255.0   U     0      0        0 veth-blue
+192.168.121.0   192.168.15.5    255.255.255.0   UG    0      0        0 veth-blue
+
+$ ip netns exec blue ip route add default via 192.168.15.5
+
+$ ip netns exec blue route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+default         192.168.15.5    0.0.0.0         UG    0      0        0 veth-blue
+192.168.15.0    0.0.0.0         255.255.255.0   U     0      0        0 veth-blue
+192.168.121.0   192.168.15.5    255.255.255.0   UG    0      0        0 veth-blue
+
+$ ip netns exec blue ping 8.8.8.8
+PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
+64 bytes from 8.8.8.8: icmp_seq=1 ttl=113 time=0.843 ms
+64 bytes from 8.8.8.8: icmp_seq=2 ttl=113 time=0.216 ms
+
+--- 8.8.8.8 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1012ms
+rtt min/avg/max/mdev = 0.216/0.529/0.843/0.313 ms
+```
+
+### External to Internal Communication to the Network Namespaces
+
+We can make use of `PORTFORWARDING`:
+
+```bash
+$ iptables -t nat -A PREROUTING --dport 80 --to-destination 192.168.15.2:80 -j DNAT
+```
+
+Now, whatever traffic comes to the 192.168.15.2:80 in the localhost, it should be forwarded to the blue namespace.
+
+----
+
