@@ -8408,6 +8408,67 @@ $ ip address show type bridge
 
 -----
 
+### Pod Networking
+
+
+-----
+
+### CNI in Kubernetes 
+
+
+------
+
+>[!Warning]
+>Weave Net Installation method is updated:
+
+Important Update:
+
+Before going to the CNI weave lecture, we have an update for the Weave Net installation link. They have announced the end of service for Weave Cloud.
+
+To know more about this, read the blog from the link below: –
+
+https://www.weave.works/blog/weave-cloud-end-of-service
+
+As an impact, the old weave net installation link won’t work anymore: –
+
+```bash
+$ kubectl apply -f “https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d ‘\n’)”
+```
+
+Instead of that, use the latest link below to install the weave net: –
+
+```bash
+$ kubectl apply -f https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s.yaml
+```
+
+Reference links:
+
+https://www.weave.works/docs/net/latest/kubernetes/kube-addon/#-installation
+https://github.com/weaveworks/weave/releases
+
+-----
+
+### Weave Works - Weave CNI Plugin
+
+![weaveworks_agent_1](weaveworks_agent_1.png)
+
+#### Deploy Weave
+
+Can be deployed as `Services` or `DaemonSets`, or we can deploy it as `Pods`:
+
+```bash
+# Latest Installation binary to deploy Weavenet:
+
+$ kubectl apply -f https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s.yaml
+```
+
+```bash
+# To Troubleshoot the weave related issues:
+$ kubectl get pods -n kube-system
+
+$ kubectl logs weave-net-<id> weave -n kube-system
+```
+-----
 
 
 
