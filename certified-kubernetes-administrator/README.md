@@ -8114,9 +8114,9 @@ rtt min/avg/max/mdev = 0.050/0.066/0.100/0.023 ms
 
 ```bash
 Commands:
-$ ip netns
-$ ip link
-$ ip addr
+$ ip netns - This lists the network namespaces
+$ ip link - This shows the network interfaces and its states
+$ ip addr - This shows the network interfaces and its IP addresses i.e. inet.
 
 # Step 1: Added a new red and blue network namespace
 
@@ -8253,5 +8253,34 @@ $ iptables -t nat -A PREROUTING --dport 80 --to-destination 192.168.15.2:80 -j D
 
 Now, whatever traffic comes to the 192.168.15.2:80 in the localhost, it should be forwarded to the blue namespace.
 
+```bash
+# check IP tables
+
+$ iptables -t nat -L POSTROUTING -n -v
+
+$ iptables -L -n -v
+$ iptables -L -n --line-numbers
+```
+
 ----
+
+### Docker Networking
+
+To all that, we saw in the [Linux Bridge](#linux-bridge), the docker does this seemlessly taking hands-off approach. Because, it creates a `bridge` network and takes care of the interfaces/IP addresses settings.
+
+So, whatever, we saw above, `Docker` makes it available for us to utilize:
+
+```bash
+$ docker run --name nginx-container -p 8080:80 --network bridge nginx
+```
+
+So, if you see here, this nginx container gets attached to the network `bridge` automatically which is already provisioned(by default) in the Docker network setup. Once, you make the `port forwarding` accessible through the `docker host`(as it automatically performs a NAT Network Address Translation), the `end-users` can reach via the `docker host` to the `nginx`.
+
+Default bridge network address: `172.17.0.0` so, whenever new applications get added to this bridge network, it assigns the IP `172.17.0.1` and so on.
+
+![docker_networking](docker_networking.png)
+
+----
+
+### CNI
 
