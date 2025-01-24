@@ -7984,9 +7984,15 @@ As we have a switch in place, we can connect all the network namespaces interfac
 ### Create the cables from the network namespaces to the bridge network
 $ ip link add veth-red type veth peer name veth-red-br
 
-$ ip link add veth-blue type veth peer name veth-blu-br
+$ ip link add veth-blue type veth peer name veth-blue-br
 
-### Attach the network namespaces and the other end to the bridge network
+### This above commands will attach the network namespaces and the other end to the bridge network
+
+# Let's create a bridge network
+$ ip link add v-net-0 type bridge
+
+# Let's switch it ON
+$ ip link set dev v-net-0 up
 
 -----
 
@@ -8103,3 +8109,305 @@ PING 192.168.15.2 (192.168.15.2) 56(84) bytes of data.
 3 packets transmitted, 3 received, 0% packet loss, time 2034ms
 rtt min/avg/max/mdev = 0.050/0.066/0.100/0.023 ms
 ```
+
+##### commands used
+
+```bash
+Commands:
+$ ip netns - This lists the network namespaces
+$ ip link - This shows the network interfaces and its states
+$ ip addr - This shows the network interfaces and its IP addresses i.e. inet.
+
+# Step 1: Added a new red and blue network namespace
+
+$ ip netns add red; ip netns add blue
+
+# Step 2: Let's create that bridge network, i.e. Switch
+
+$ ip link add v-net-0 type bridge
+
+# Step 3: Let's create the cables and interfaces
+
+$ ip link add veth-red type veth peer name veth-red-br; ip link add veth-blue type veth peer name veth-blue-br
+
+Interfaces:
+veth-red => red
+veth-blue => blue
+veth-blue-br => bridge (port 1)
+veth-red-br => bridge (port 2)
+
+# Once adding the interfaces, i.e. the cables, let's set those cables to those interfaces:
+
+$ ip link set veth-blue netns blue; ip link set veth-red netns red
+
+$ ip link set veth-blue-br master v-net-0; ip link set veth-red-br master v-net-0
+
+# Step 4: Let's add those IP addresses:
+
+$ ip netns exec red ip addr add 192.168.15.1/24 dev veth-red;ip netns exec blue ip addr add 192.168.15.2/24 dev veth-blue
+
+# Step 5: Let's UP all the interfaces
+
+$ ip netns exec red ip link set veth-red up; ip netns exec blue ip link set veth-blue up
+$ ip link set veth-red-br up; ip link set veth-blue-br up
+$ ip link set dev v-net-0 up
+
+
+# Here, you see, the veth-red interface, is DOWN "state DOWN" and once we start UP the interfaces, you see the state is UP "state UP".
+
+$ ip netns exec red ip link
+1: lo: <LOOPBACK> mtu 65536 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+10: veth-red@if9: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/ether 9e:12:30:ef:55:70 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+
+$ ip netns exec red ip link
+1: lo: <LOOPBACK> mtu 65536 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+10: veth-red@if9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP mode DEFAULT group default qlen 1000
+    link/ether 9e:12:30:ef:55:70 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+```
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant RedNamespace
+    participant BlueNamespace
+    participant Bridge as Bridge (v-net-0)
+
+    User->>OS: Add "red" namespace
+    User->>OS: Add "blue" namespace
+
+    User->>OS: Create bridge network "v-net-0"
+
+    User->>OS: Create veth pair (veth-red, veth-red-br)
+    User->>OS: Create veth pair (veth-blue, veth-blue-br)
+
+    User->>RedNamespace: Assign veth-red to "red" namespace
+    User->>BlueNamespace: Assign veth-blue to "blue" namespace
+
+    User->>Bridge: Assign veth-red-br as port 1
+    User->>Bridge: Assign veth-blue-br as port 2
+
+    User->>RedNamespace: Assign IP 192.168.15.1/24 to veth-red
+    User->>BlueNamespace: Assign IP 192.168.15.2/24 to veth-blue
+
+    User->>RedNamespace: Bring veth-red UP
+    User->>BlueNamespace: Bring veth-blue UP
+
+    User->>Bridge: Bring veth-red-br UP
+    User->>Bridge: Bring veth-blue-br UP
+    User->>Bridge: Bring bridge "v-net-0" UP
+```
+
+### Internal to External Communication from the Network Namespaces
+
+Now, let's try to add an IP address to the `v-net-0` interface i.e. the `bridge` does not have an `IP address`:
+
+```bash
+$ ip addr add 192.168.15.5/24 dev v-net-0
+
+$ ip netns exec blue ip route add 192.168.1.0/24 via 192.168.15.5
+
+or
+$ ip netns exec blue ip route add 192.168.121.0/24 via 192.168.15.5
+
+or
+
+$ ip netns exec blue ip route add <host_ip_address>/24 via 192.168.15.5
+
+iptables -t nat -A POSTROUTING -s 192.168.15.0/24 -j MASQUERADE
+
+$ ip netns exec blue route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+192.168.15.0    0.0.0.0         255.255.255.0   U     0      0        0 veth-blue
+192.168.121.0   192.168.15.5    255.255.255.0   UG    0      0        0 veth-blue
+
+$ ip netns exec blue ip route add default via 192.168.15.5
+
+$ ip netns exec blue route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+default         192.168.15.5    0.0.0.0         UG    0      0        0 veth-blue
+192.168.15.0    0.0.0.0         255.255.255.0   U     0      0        0 veth-blue
+192.168.121.0   192.168.15.5    255.255.255.0   UG    0      0        0 veth-blue
+
+$ ip netns exec blue ping 8.8.8.8
+PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
+64 bytes from 8.8.8.8: icmp_seq=1 ttl=113 time=0.843 ms
+64 bytes from 8.8.8.8: icmp_seq=2 ttl=113 time=0.216 ms
+
+--- 8.8.8.8 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1012ms
+rtt min/avg/max/mdev = 0.216/0.529/0.843/0.313 ms
+```
+
+### External to Internal Communication to the Network Namespaces
+
+We can make use of `PORTFORWARDING`:
+
+```bash
+$ iptables -t nat -A PREROUTING --dport 80 --to-destination 192.168.15.2:80 -j DNAT
+```
+
+Now, whatever traffic comes to the 192.168.15.2:80 in the localhost, it should be forwarded to the blue namespace.
+
+```bash
+# check IP tables
+
+$ iptables -t nat -L POSTROUTING -n -v
+
+$ iptables -L -n -v
+$ iptables -L -n --line-numbers
+```
+
+----
+
+### Docker Networking
+
+To all that, we saw in the [Linux Bridge](#linux-bridge), the docker does this seemlessly taking hands-off approach. Because, it creates a `bridge` network and takes care of the interfaces/IP addresses settings.
+
+So, whatever, we saw above, `Docker` makes it available for us to utilize:
+
+```bash
+$ docker run --name nginx-container -p 8080:80 --network bridge nginx
+```
+
+So, if you see here, this nginx container gets attached to the network `bridge` automatically which is already provisioned(by default) in the Docker network setup. Once, you make the `port forwarding` accessible through the `docker host`(as it automatically performs a NAT Network Address Translation), the `end-users` can reach via the `docker host` to the `nginx`.
+
+Default bridge network address: `172.17.0.0` so, whenever new applications get added to this bridge network, it assigns the IP `172.17.0.1` and so on.
+
+![docker_networking](docker_networking.png)
+
+----
+
+### CNI - Container Networking Interface
+
+
+### Cluster Networking - Networking in Kubernetes
+
+![open_port_k8s](open_port_k8s.png)
+
+>[!Important]
+>This table outlines the important ports and services for Kubernetes master and worker nodes.
+
+| **Component**              | **Port(s)**           | **Description**                         |
+|----------------------------|-----------------------|-----------------------------------------|
+| **Master Node**            |                       |                                         |
+| ETCD                       | 2379                 | Communication between ETCD nodes.       |
+| kube-api                   | 6443                 | Kubernetes API server.                  |
+| kubelet                    | 10250                | Kubernetes Kubelet on the master node.  |
+| kube-scheduler             | 10259                | Kubernetes Scheduler.                   |
+| kube-controller-manager    | 10257                | Kubernetes Controller Manager.          |
+| ETCD client                | 2380 (if multi-master)| ETCD inter-node communication.          |
+| **Worker Node**            |                       |                                         |
+| Services                   | 30000-32767          | NodePort service range.                 |
+| kubelet                    | 10250                | Kubernetes Kubelet on the worker node.  |
+| kube-proxy                 | 10256                | Kubernetes kube-proxy on the worker node.  |
+
+- Refer to this, official K8s documentation on [Ports and Protocols](https://kubernetes.io/docs/reference/networking/ports-and-protocols/).
+
+----
+
+##### Commands Used:
+
+```
+$ ip link 
+$ ip addr
+$ ip addr add 192.168.1.10/24 dev eth0
+$ ip route
+$ ip route add 192.168.1.0/24 via 192.168.2.1
+$ cat /proc/sys/net/ipv4/ip_forward
+$ arp
+$ netstat -plnt
+```
+
+##### Exam Tip
+
+An important tip about deploying `Network Addons` in a `Kubernetes cluster`.
+
+In the upcoming labs, we will work with Network Addons. This includes installing a network plugin in the cluster. While we have used weave-net as an example, please bear in mind that you can use any of the plugins which are described here:
+
+https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+https://kubernetes.io/docs/concepts/cluster-administration/networking/#how-to-implement-the-kubernetes-networking-model
+
+In the `CKA exam`, for a question that requires you to deploy a network addon, unless specifically directed, you may use any of the solutions described in the link above.
+
+However, the documentation currently does not contain a direct reference to the exact command to be used to deploy a third-party network addon.
+
+The links above redirect to third-party/ vendor sites or GitHub repositories, which cannot be used in the exam. This has been intentionally done to keep the content in the Kubernetes documentation vendor-neutral.
+
+Note: In the official exam, all essential CNI deployment details will be provided
+
+-----
+##### Important K8s Networking Questions:
+
+<details><summary>Q1:  What is the port the kube-scheduler is listening on in the controlplane node?</summary>
+
+A: 
+```bash
+$ netstat -tulpn
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        0      0 192.168.233.136:2380    0.0.0.0:*               LISTEN      3367/etcd           
+tcp        0      0 192.168.233.136:2379    0.0.0.0:*               LISTEN      3367/etcd           
+tcp        0      0 127.0.0.1:34881         0.0.0.0:*               LISTEN      961/containerd      
+tcp        0      0 127.0.0.1:2381          0.0.0.0:*               LISTEN      3367/etcd           
+tcp        0      0 127.0.0.1:2379          0.0.0.0:*               LISTEN      3367/etcd           
+tcp        0      0 127.0.0.53:53           0.0.0.0:*               LISTEN      557/systemd-resolve 
+tcp        0      0 127.0.0.1:10259         0.0.0.0:*               LISTEN      3374/kube-scheduler 
+tcp        0      0 127.0.0.1:10257         0.0.0.0:*               LISTEN      3903/kube-controlle 
+tcp        0      0 127.0.0.1:10248         0.0.0.0:*               LISTEN      4164/kubelet        
+tcp        0      0 127.0.0.1:10249         0.0.0.0:*               LISTEN      4631/kube-proxy     
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      963/sshd: /usr/sbin 
+tcp        0      0 0.0.0.0:8080            0.0.0.0:*               LISTEN      965/ttyd            
+tcp6       0      0 :::22                   :::*                    LISTEN      963/sshd: /usr/sbin 
+tcp6       0      0 :::6443                 :::*                    LISTEN      3680/kube-apiserver 
+tcp6       0      0 :::10250                :::*                    LISTEN      4164/kubelet        
+tcp6       0      0 :::10256                :::*                    LISTEN      4631/kube-proxy     
+tcp6       0      0 :::8888                 :::*                    LISTEN      4325/kubectl        
+udp        0      0 127.0.0.53:53           0.0.0.0:*                           557/systemd-resolve 
+udp        0      0 0.0.0.0:8472            0.0.0.0:*                           -                   
+
+```
+</details>
+
+<details><summary>Q2: How many client connections are Established under ETCD and what port?
+</summary>
+
+A:
+```bash
+$ netstat -tulpna | head -n 1; netstat -tulpna | grep -e "etcd"
+Active Internet connections (servers and established)
+tcp        0      0 192.168.233.136:2380    0.0.0.0:*               LISTEN      3367/etcd           
+tcp        0      0 192.168.233.136:2379    0.0.0.0:*               LISTEN      3367/etcd           
+tcp        0      0 127.0.0.1:2381          0.0.0.0:*               LISTEN      3367/etcd           
+...
+...           
+tcp        0      0 127.0.0.1:2379          127.0.0.1:48810         ESTABLISHED 3367/etcd           
+tcp        0      0 127.0.0.1:2379          127.0.0.1:49052         ESTABLISHED 3367/etcd           
+```
+
+The ETCD client connections are established under the `port 2379` and it is the most number of connections.
+</details>
+
+<details><summary>Q3: How do you find the bridge interface among multiple interfaces?
+</summary>
+
+A: 
+```bash
+# show type bridge shows the interface
+
+$ ip address show type bridge
+```
+
+</details>
+
+
+-----
+
+
+
+
