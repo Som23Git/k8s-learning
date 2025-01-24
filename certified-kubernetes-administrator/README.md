@@ -8282,5 +8282,132 @@ Default bridge network address: `172.17.0.0` so, whenever new applications get a
 
 ----
 
-### CNI
+### CNI - Container Networking Interface
+
+
+### Cluster Networking - Networking in Kubernetes
+
+![open_port_k8s](open_port_k8s.png)
+
+>[!Important]
+>This table outlines the important ports and services for Kubernetes master and worker nodes.
+
+| **Component**              | **Port(s)**           | **Description**                         |
+|----------------------------|-----------------------|-----------------------------------------|
+| **Master Node**            |                       |                                         |
+| ETCD                       | 2379                 | Communication between ETCD nodes.       |
+| kube-api                   | 6443                 | Kubernetes API server.                  |
+| kubelet                    | 10250                | Kubernetes Kubelet on the master node.  |
+| kube-scheduler             | 10259                | Kubernetes Scheduler.                   |
+| kube-controller-manager    | 10257                | Kubernetes Controller Manager.          |
+| ETCD client                | 2380 (if multi-master)| ETCD inter-node communication.          |
+| **Worker Node**            |                       |                                         |
+| Services                   | 30000-32767          | NodePort service range.                 |
+| kubelet                    | 10250                | Kubernetes Kubelet on the worker node.  |
+| kube-proxy                 | 10256                | Kubernetes kube-proxy on the worker node.  |
+
+- Refer to this, official K8s documentation on [Ports and Protocols](https://kubernetes.io/docs/reference/networking/ports-and-protocols/).
+
+----
+
+##### Commands Used:
+
+```
+$ ip link 
+$ ip addr
+$ ip addr add 192.168.1.10/24 dev eth0
+$ ip route
+$ ip route add 192.168.1.0/24 via 192.168.2.1
+$ cat /proc/sys/net/ipv4/ip_forward
+$ arp
+$ netstat -plnt
+```
+
+##### Exam Tip
+
+An important tip about deploying `Network Addons` in a `Kubernetes cluster`.
+
+In the upcoming labs, we will work with Network Addons. This includes installing a network plugin in the cluster. While we have used weave-net as an example, please bear in mind that you can use any of the plugins which are described here:
+
+https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+https://kubernetes.io/docs/concepts/cluster-administration/networking/#how-to-implement-the-kubernetes-networking-model
+
+In the `CKA exam`, for a question that requires you to deploy a network addon, unless specifically directed, you may use any of the solutions described in the link above.
+
+However, the documentation currently does not contain a direct reference to the exact command to be used to deploy a third-party network addon.
+
+The links above redirect to third-party/ vendor sites or GitHub repositories, which cannot be used in the exam. This has been intentionally done to keep the content in the Kubernetes documentation vendor-neutral.
+
+Note: In the official exam, all essential CNI deployment details will be provided
+
+-----
+##### Important K8s Networking Questions:
+
+<details><summary>Q1:  What is the port the kube-scheduler is listening on in the controlplane node?</summary>
+
+A: 
+```bash
+$ netstat -tulpn
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        0      0 192.168.233.136:2380    0.0.0.0:*               LISTEN      3367/etcd           
+tcp        0      0 192.168.233.136:2379    0.0.0.0:*               LISTEN      3367/etcd           
+tcp        0      0 127.0.0.1:34881         0.0.0.0:*               LISTEN      961/containerd      
+tcp        0      0 127.0.0.1:2381          0.0.0.0:*               LISTEN      3367/etcd           
+tcp        0      0 127.0.0.1:2379          0.0.0.0:*               LISTEN      3367/etcd           
+tcp        0      0 127.0.0.53:53           0.0.0.0:*               LISTEN      557/systemd-resolve 
+tcp        0      0 127.0.0.1:10259         0.0.0.0:*               LISTEN      3374/kube-scheduler 
+tcp        0      0 127.0.0.1:10257         0.0.0.0:*               LISTEN      3903/kube-controlle 
+tcp        0      0 127.0.0.1:10248         0.0.0.0:*               LISTEN      4164/kubelet        
+tcp        0      0 127.0.0.1:10249         0.0.0.0:*               LISTEN      4631/kube-proxy     
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      963/sshd: /usr/sbin 
+tcp        0      0 0.0.0.0:8080            0.0.0.0:*               LISTEN      965/ttyd            
+tcp6       0      0 :::22                   :::*                    LISTEN      963/sshd: /usr/sbin 
+tcp6       0      0 :::6443                 :::*                    LISTEN      3680/kube-apiserver 
+tcp6       0      0 :::10250                :::*                    LISTEN      4164/kubelet        
+tcp6       0      0 :::10256                :::*                    LISTEN      4631/kube-proxy     
+tcp6       0      0 :::8888                 :::*                    LISTEN      4325/kubectl        
+udp        0      0 127.0.0.53:53           0.0.0.0:*                           557/systemd-resolve 
+udp        0      0 0.0.0.0:8472            0.0.0.0:*                           -                   
+
+```
+</details>
+
+<details><summary>Q2: How many client connections are Established under ETCD and what port?
+</summary>
+
+A:
+```bash
+$ netstat -tulpna | head -n 1; netstat -tulpna | grep -e "etcd"
+Active Internet connections (servers and established)
+tcp        0      0 192.168.233.136:2380    0.0.0.0:*               LISTEN      3367/etcd           
+tcp        0      0 192.168.233.136:2379    0.0.0.0:*               LISTEN      3367/etcd           
+tcp        0      0 127.0.0.1:2381          0.0.0.0:*               LISTEN      3367/etcd           
+...
+...           
+tcp        0      0 127.0.0.1:2379          127.0.0.1:48810         ESTABLISHED 3367/etcd           
+tcp        0      0 127.0.0.1:2379          127.0.0.1:49052         ESTABLISHED 3367/etcd           
+```
+
+The ETCD client connections are established under the `port 2379` and it is the most number of connections.
+</details>
+
+<details><summary>Q3: How do you find the bridge interface among multiple interfaces?
+</summary>
+
+A: 
+```bash
+# show type bridge shows the interface
+
+$ ip address show type bridge
+```
+
+</details>
+
+
+-----
+
+
+
 
