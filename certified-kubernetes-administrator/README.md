@@ -8504,6 +8504,7 @@ Jan 24 05:11:02 controlplane kubelet[4144]: E0124 05:11:02.842568    4144 info.g
 
 ```bash
 $ ps -aux | grep -i kubelet | grep container-runtime
+root        4212  0.0  0.0 4188260 75976 ?       Ssl  11:52   0:41 /usr/bin/kubelet --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf --config=/var/lib/kubelet/config.yaml --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --pod-infra-container-image=registry.k8s.io/pause:3.10
 ```
 
 ##### CNI Questions:
@@ -8574,3 +8575,491 @@ The answer is `Flannel` as the `isDefaultGateway` is set to `true`, whereas the 
 </details>
 
 ------
+
+```bash
+$ kubectl get all -n kube-system
+NAME                                       READY   STATUS    RESTARTS   AGE
+pod/coredns-77d6fd4654-2n8r9               1/1     Running   0          37m
+pod/coredns-77d6fd4654-wwng5               1/1     Running   0          37m
+pod/etcd-controlplane                      1/1     Running   0          37m
+pod/kube-apiserver-controlplane            1/1     Running   0          37m
+pod/kube-controller-manager-controlplane   1/1     Running   0          37m
+pod/kube-proxy-qv6mc                       1/1     Running   0          37m
+pod/kube-scheduler-controlplane            1/1     Running   0          37m
+
+NAME               TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                  AGE
+service/kube-dns   ClusterIP   10.96.0.10   <none>        53/UDP,53/TCP,9153/TCP   37m
+
+NAME                        DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE
+daemonset.apps/kube-proxy   1         1         1       1            1           kubernetes.io/os=linux   37m
+
+NAME                      READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/coredns   2/2     2            2           37m
+
+NAME                                 DESIRED   CURRENT   READY   AGE
+replicaset.apps/coredns-77d6fd4654   2         2         2       37m
+
+
+Events:
+  Type     Reason                  Age                  From               Message
+  ----     ------                  ----                 ----               -------
+  Normal   Scheduled               2m40s                default-scheduler  Successfully assigned default/app to controlplane
+  Warning  FailedCreatePodSandBox  2m40s                kubelet            Failed to create pod sandbox: rpc error: code = Unknown desc = failed to setup network for sandbox "f6a19b30ef75e1457c03ba90c7c232d9979484e6f9e7f8d9245fa1ca2eb8377d": plugin type="weave-net" name="weave" failed (add): unable to allocate IP address: Post "http://127.0.0.1:6784/ip/f6a19b30ef75e1457c03ba90c7c232d9979484e6f9e7f8d9245fa1ca2eb8377d": dial tcp 127.0.0.1:6784: connect: connection refused
+  Normal   SandboxChanged          7s (x13 over 2m39s)  kubelet            Pod sandbox changed, it will be killed and re-created.
+```
+```yaml
+$ cat weave-daemonset-k8s.yaml 
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      name: weave-net
+      labels:
+        name: weave-net
+      namespace: kube-system
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      name: weave-net
+      labels:
+        name: weave-net
+    rules:
+      - apiGroups:
+          - ''
+        resources:
+          - pods
+          - namespaces
+          - nodes
+        verbs:
+          - get
+          - list
+          - watch
+      - apiGroups:
+          - extensions
+        resources:
+          - networkpolicies
+        verbs:
+          - get
+          - list
+          - watch
+      - apiGroups:
+          - 'networking.k8s.io'
+        resources:
+          - networkpolicies
+        verbs:
+          - get
+          - list
+          - watch
+      - apiGroups:
+        - ''
+        resources:
+        - nodes/status
+        verbs:
+        - patch
+        - update
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    metadata:
+      name: weave-net
+      labels:
+        name: weave-net
+    roleRef:
+      kind: ClusterRole
+      name: weave-net
+      apiGroup: rbac.authorization.k8s.io
+    subjects:
+      - kind: ServiceAccount
+        name: weave-net
+        namespace: kube-system
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: Role
+    metadata:
+      name: weave-net
+      namespace: kube-system
+      labels:
+        name: weave-net
+    rules:
+      - apiGroups:
+          - ''
+        resources:
+          - configmaps
+        resourceNames:
+          - weave-net
+        verbs:
+          - get
+          - update
+      - apiGroups:
+          - ''
+        resources:
+          - configmaps
+        verbs:
+          - create
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    metadata:
+      name: weave-net
+      namespace: kube-system
+      labels:
+        name: weave-net
+    roleRef:
+      kind: Role
+      name: weave-net
+      apiGroup: rbac.authorization.k8s.io
+    subjects:
+      - kind: ServiceAccount
+        name: weave-net
+        namespace: kube-system
+  - apiVersion: apps/v1
+    kind: DaemonSet
+    metadata:
+      name: weave-net
+      labels:
+        name: weave-net
+      namespace: kube-system
+    spec:
+      # Wait 5 seconds to let pod connect before rolling next pod
+      selector:
+        matchLabels:
+          name: weave-net
+      minReadySeconds: 5
+      template:
+        metadata:
+          labels:
+            name: weave-net
+        spec:
+          initContainers:
+            - name: weave-init
+              image: 'weaveworks/weave-kube:2.8.1'
+              command:
+                - /home/weave/init.sh
+              env:
+              securityContext:
+                privileged: true
+              volumeMounts:
+                - name: cni-bin
+                  mountPath: /host/opt
+                - name: cni-bin2
+                  mountPath: /host/home
+                - name: cni-conf
+                  mountPath: /host/etc
+                - name: lib-modules
+                  mountPath: /lib/modules
+                - name: xtables-lock
+                  mountPath: /run/xtables.lock
+                  readOnly: false
+          containers:
+            - name: weave
+              command:
+                - /home/weave/launch.sh
+              env:
+                - name: IPALLOC_RANGE
+                  value: 10.32.1.0/24
+                - name: INIT_CONTAINER
+                  value: "true"
+                - name: HOSTNAME
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: spec.nodeName
+              image: 'weaveworks/weave-kube:2.8.1'
+              readinessProbe:
+                httpGet:
+                  host: 127.0.0.1
+                  path: /status
+                  port: 6784
+              resources:
+                requests:
+                  cpu: 50m
+              securityContext:
+                privileged: true
+              volumeMounts:
+                - name: weavedb
+                  mountPath: /weavedb
+                - name: dbus
+                  mountPath: /host/var/lib/dbus
+                  readOnly: true
+                - mountPath: /host/etc/machine-id
+                  name: cni-machine-id
+                  readOnly: true
+                - name: xtables-lock
+                  mountPath: /run/xtables.lock
+                  readOnly: false
+            - name: weave-npc
+              env:
+                - name: HOSTNAME
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: spec.nodeName
+              image: 'weaveworks/weave-npc:2.8.1'
+#npc-args
+              resources:
+                requests:
+                  cpu: 50m
+              securityContext:
+                privileged: true
+              volumeMounts:
+                - name: xtables-lock
+                  mountPath: /run/xtables.lock
+                  readOnly: false
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          hostPID: false
+          restartPolicy: Always
+          securityContext:
+            seLinuxOptions: {}
+          serviceAccountName: weave-net
+          tolerations:
+            - effect: NoSchedule
+              operator: Exists
+            - effect: NoExecute
+              operator: Exists
+          volumes:
+            - name: weavedb
+              hostPath:
+                path: /var/lib/weave
+            - name: cni-bin
+              hostPath:
+                path: /opt
+            - name: cni-bin2
+              hostPath:
+                path: /home
+            - name: cni-conf
+              hostPath:
+                path: /etc
+            - name: cni-machine-id
+              hostPath:
+                path: /etc/machine-id
+            - name: dbus
+              hostPath:
+                path: /var/lib/dbus
+            - name: lib-modules
+              hostPath:
+                path: /lib/modules
+            - name: xtables-lock
+              hostPath:
+                path: /run/xtables.lock
+                type: FileOrCreate
+          priorityClassName: system-node-critical
+      updateStrategy:
+        type: RollingUpdate
+```
+```bash
+$ kubectl apply -f weave-daemonset-k8s.yaml 
+serviceaccount/weave-net created
+clusterrole.rbac.authorization.k8s.io/weave-net created
+clusterrolebinding.rbac.authorization.k8s.io/weave-net created
+role.rbac.authorization.k8s.io/weave-net created
+rolebinding.rbac.authorization.k8s.io/weave-net created
+daemonset.apps/weave-net created
+
+
+$ kubectl get all -n kube-system
+NAME                                       READY   STATUS    RESTARTS   AGE
+pod/coredns-77d6fd4654-2n8r9               1/1     Running   0          40m
+pod/coredns-77d6fd4654-wwng5               1/1     Running   0          40m
+pod/etcd-controlplane                      1/1     Running   0          40m
+pod/kube-apiserver-controlplane            1/1     Running   0          40m
+pod/kube-controller-manager-controlplane   1/1     Running   0          40m
+pod/kube-proxy-qv6mc                       1/1     Running   0          40m
+pod/kube-scheduler-controlplane            1/1     Running   0          40m
+pod/weave-net-g7n2b                        2/2     Running   0          35s
+
+NAME               TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                  AGE
+service/kube-dns   ClusterIP   10.96.0.10   <none>        53/UDP,53/TCP,9153/TCP   40m
+
+NAME                        DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE
+daemonset.apps/kube-proxy   1         1         1       1            1           kubernetes.io/os=linux   40m
+daemonset.apps/weave-net    1         1         1       1            1           <none>                   35s
+
+NAME                      READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/coredns   2/2     2            2           40m
+
+NAME                                 DESIRED   CURRENT   READY   AGE
+replicaset.apps/coredns-77d6fd4654   2         2         2       40m
+```
+
+- Official Weaveworks binary packages: https://github.com/weaveworks/weave/releases
+
+
+-----
+
+### IPAM - IP Address Management
+
+![ipam_weave_cni_1](ipam_weave_cni_1.png)
+
+![ipam_weave_cni_2](ipam_weave_cni_2.png)
+
+Two CNI plugins who'll manages IP address:
+- DHCP
+- host-local
+
+```bash
+$ cat /etc/cni/net.d/net-script.conf
+
+# Weavenet can be set within the IPs: 10.32.0.0./12 -> 10.32.0.1 > 10.47.266.254
+
+$ ip link
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: datapath: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1376 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+    link/ether 2e:b9:8a:5d:e2:7f brd ff:ff:ff:ff:ff:ff
+4: weave: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1376 qdisc noqueue state UP mode DEFAULT group default qlen 1000
+    link/ether fa:67:d9:50:df:5a brd ff:ff:ff:ff:ff:ff
+6: vethwe-datapath@vethwe-bridge: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1376 qdisc noqueue master datapath state UP mode DEFAULT group default 
+    link/ether 72:36:03:07:ca:d7 brd ff:ff:ff:ff:ff:ff
+7: vethwe-bridge@vethwe-datapath: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1376 qdisc noqueue master weave state UP mode DEFAULT group default 
+    link/ether 7a:0b:4e:67:1b:d9 brd ff:ff:ff:ff:ff:ff
+8: vxlan-6784: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 65535 qdisc noqueue master datapath state UNKNOWN mode DEFAULT group default qlen 1000
+    link/ether d2:46:e8:5b:5c:87 brd ff:ff:ff:ff:ff:ff
+10: vethweplfc6ca6f@if9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1376 qdisc noqueue master weave state UP mode DEFAULT group default 
+    link/ether 36:d8:eb:3a:df:8c brd ff:ff:ff:ff:ff:ff link-netns cni-e0d7d33a-e519-f66f-1a70-706cb741016e
+12: vethweplbedcb6e@if11: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1376 qdisc noqueue master weave state UP mode DEFAULT group default 
+    link/ether 4e:d2:de:29:f3:2e brd ff:ff:ff:ff:ff:ff link-netns cni-422efb75-bfbd-772e-3b59-f4cb7ec6ef31
+6205: eth0@if6206: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450 qdisc noqueue state UP mode DEFAULT group default 
+    link/ether 02:42:c0:0a:13:06 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+6207: eth1@if6208: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP mode DEFAULT group default 
+    link/ether 02:42:ac:19:00:03 brd ff:ff:ff:ff:ff:ff link-netnsid 1
+
+$ /etc/cni/net.d ➜  ip link show type bridge
+4: weave: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1376 qdisc noqueue state UP mode DEFAULT group default qlen 1000
+    link/ether fa:67:d9:50:df:5a brd ff:ff:ff:ff:ff:ff
+```
+-----
+
+### Service Networking
+
+Basically, the services that are created and provided an IP address but, there is no pod, no network namespace, or container created, it is just an object created.
+
+Please note, the `clusterIP` and `nodePort` services are cluster-wide objects where, the services are accessible from all the nodes. The IP addressed associated to those services are basically done through a Network Address Translation table.
+
+**In the below image, if you note, the `service IP:Port` is the service IP and port whereas, it is forwarded to the `pod IP:Port`:**
+
+![service_networking_nat_config_1](service_networking_nat_config_1.png)
+
+![service_networking_kube_proxy_iptables_2](service_networking_kube_proxy_iptables_2.png)
+
+```bash
+# you can find the kubeproxy logs updating the service details 
+$ cat /var/log/kube-proxy.log
+```
+
+------
+
+##### Questions & Commands Used:
+
+<details><summary>Q1: What network range are the nodes in the cluster part of?</summary>
+
+```bash
+$ kubectl get nodes -o wide
+NAME           STATUS   ROLES           AGE   VERSION   INTERNAL-IP   EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION   CONTAINER-RUNTIME
+controlplane   Ready    control-plane   27m   v1.31.0   192.11.78.6   <none>        Ubuntu 22.04.4 LTS   5.4.0-1106-gcp   containerd://1.6.26
+node01         Ready    <none>          26m   v1.31.0   192.11.78.9   <none>        Ubuntu 22.04.4 LTS   5.4.0-1106-gcp   containerd://1.6.26
+```
+
+Seems like the nodes are part of the network range: `192.11.78.0/24`
+
+</details>
+
+<details><summary>Q2: What is the range of IP addresses configured for PODs on this cluster?</summary>
+
+To understand this, let create a new pod and check the IP address:
+```bash
+$ kubectl run nginx --image=nginx
+pod/nginx created
+
+$ kubectl get pods -o wide
+NAME    READY   STATUS              RESTARTS   AGE   IP       NODE     NOMINATED NODE   READINESS GATES
+nginx   0/1     ContainerCreating   0          5s    <none>   node01   <none>           <none>
+
+$ kubectl get pods -o wide
+NAME    READY   STATUS    RESTARTS   AGE   IP             NODE     NOMINATED NODE   READINESS GATES
+nginx   1/1     Running   0          8s    10.244.192.1   node01   <none>           <none>
+```
+
+Seems like the pods are part of the network range: `10.244.192.0/24` or `10.244.0.0/16`
+
+</details>
+
+
+<details><summary>Q3: What is the IP Range configured for the services within the cluster?</summary>
+
+To understand this, let's check the kube-apiserver where it passes: `--service-cluster-ip-range=10.96.0.0/12`
+
+```bash
+$ ps -aux | grep -i "kube-apiserver"
+root        3648  0.0  0.1 1525984 284272 ?      Ssl  12:51   1:24 kube-apiserver --advertise-address=192.10.197.12 --allow-privileged=true --authorization-mode=Node,RBAC --client-ca-file=/etc/kubernetes/pki/ca.crt --enable-admission-plugins=NodeRestriction --enable-bootstrap-token-auth=true --etcd-cafile=/etc/kubernetes/pki/etcd/ca.crt --etcd-certfile=/etc/kubernetes/pki/apiserver-etcd-client.crt --etcd-keyfile=/etc/kubernetes/pki/apiserver-etcd-client.key --etcd-servers=https://127.0.0.1:2379 --kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt --kubelet-client-key=/etc/kubernetes/pki/apiserver-kubelet-client.key --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname --proxy-client-cert-file=/etc/kubernetes/pki/front-proxy-client.crt --proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key --requestheader-allowed-names=front-proxy-client --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt --requestheader-extra-headers-prefix=X-Remote-Extra- --requestheader-group-headers=X-Remote-Group --requestheader-username-headers=X-Remote-User --secure-port=6443 --service-account-issuer=https://kubernetes.default.svc.cluster.local --service-account-key-file=/etc/kubernetes/pki/sa.pub --service-account-signing-key-file=/etc/kubernetes/pki/sa.key --service-cluster-ip-range=10.96.0.0/12 --tls-cert-file=/etc/kubernetes/pki/apiserver.crt --tls-private-key-file=/etc/kubernetes/pki/apiserver.key
+root       11079  0.0  0.0   6936  2232 pts/2    S+   13:35   0:00 grep --color=auto -i kube-apiserver
+```
+
+Seems like the services are part of the network range: `10.96.0.0/12`
+
+</details>
+
+<details><summary>Q4: How many kube-proxy pods are deployed in this cluster?</summary> 
+
+```bash
+$ kubectl get pods -A -o wide
+NAMESPACE     NAME                                   READY   STATUS    RESTARTS      AGE   IP            NODE           NOMINATED NODE   READINESS GATES
+kube-system   coredns-77d6fd4654-kc28n               1/1     Running   0             29m   10.244.0.3    controlplane   <none>           <none>
+kube-system   coredns-77d6fd4654-n6bvc               1/1     Running   0             29m   10.244.0.2    controlplane   <none>           <none>
+kube-system   etcd-controlplane                      1/1     Running   0             29m   192.11.78.6   controlplane   <none>           <none>
+kube-system   kube-apiserver-controlplane            1/1     Running   0             29m   192.11.78.6   controlplane   <none>           <none>
+kube-system   kube-controller-manager-controlplane   1/1     Running   0             29m   192.11.78.6   controlplane   <none>           <none>
+kube-system   kube-proxy-5knwl                       1/1     Running   0             29m   192.11.78.9   node01         <none>           <none>
+kube-system   kube-proxy-bxmt6                       1/1     Running   0             29m   192.11.78.6   controlplane   <none>           <none>
+kube-system   kube-scheduler-controlplane            1/1     Running   0             29m   192.11.78.6   controlplane   <none>           <none>
+kube-system   weave-net-cgvxb                        2/2     Running   0             29m   192.11.78.9   node01         <none>           <none>
+kube-system   weave-net-dbgkx                        2/2     Running   1 (29m ago)   29m   192.11.78.6   controlplane   <none>           <none>
+```
+
+There are two `kube-proxy pods` - `kube-proxy-5knwl and kube-proxy-bxmt6`
+
+</details>
+
+<details><summary>Q5: What `type` of proxy is the kube-proxy configured to use?</summary> 
+
+```bash
+kubectl logs pod/kube-proxy-5knwl -n kube-system
+I0124 12:52:20.968536       1 server_linux.go:66] "Using iptables proxy"
+I0124 12:52:21.140070       1 server.go:677] "Successfully retrieved node IP(s)" IPs=["192.10.197.3"]
+I0124 12:52:21.160761       1 conntrack.go:60] "Setting nf_conntrack_max" nfConntrackMax=1179648
+I0124 12:52:21.162817       1 conntrack.go:121] "Set sysctl" entry="net/netfilter/nf_conntrack_tcp_timeout_established" value=86400
+E0124 12:52:21.164320       1 server.go:234] "Kube-proxy configuration may be incomplete or incorrect" err="nodePortAddresses is unset; NodePort connections will be accepted on all local IPs. Consider using `--nodeport-addresses primary`"
+I0124 12:52:21.186680       1 server.go:243] "kube-proxy running in dual-stack mode" primary ipFamily="IPv4"
+I0124 12:52:21.186735       1 server_linux.go:169] "Using iptables Proxier"
+I0124 12:52:21.189087       1 proxier.go:255] "Setting route_localnet=1 to allow node-ports on localhost; to change this either disable iptables.localhostNodePorts (--iptables-localhost-nodeports) or set nodePortAddresses (--nodeport-addresses) to filter loopback addresses" ipFamily="IPv4"
+I0124 12:52:21.207947       1 server.go:483] "Version info" version="v1.31.0"
+I0124 12:52:21.207991       1 server.go:485] "Golang settings" GOGC="" GOMAXPROCS="" GOTRACEBACK=""
+I0124 12:52:21.211185       1 config.go:197] "Starting service config controller"
+I0124 12:52:21.211211       1 config.go:326] "Starting node config controller"
+I0124 12:52:21.211227       1 shared_informer.go:313] Waiting for caches to sync for node config
+I0124 12:52:21.211229       1 shared_informer.go:313] Waiting for caches to sync for service config
+I0124 12:52:21.211325       1 config.go:104] "Starting endpoint slice config controller"
+I0124 12:52:21.211340       1 shared_informer.go:313] Waiting for caches to sync for endpoint slice config
+I0124 12:52:21.311388       1 shared_informer.go:320] Caches are synced for node config
+I0124 12:52:21.311480       1 shared_informer.go:320] Caches are synced for endpoint slice config
+I0124 12:52:21.311574       1 shared_informer.go:320] Caches are synced for service config
+```
+
+From this logline: `Using iptables proxy` -> We could see that the kube-proxy is using the `iptables`.
+
+</details>
+
+<details><summary>Q5: How does this Kubernetes cluster ensure that a kube-proxy pod runs on all nodes in the cluster?</summary> 
+
+```bash
+$ kubectl get pod/kube-proxy-5knwl -n kube-system -o yaml | grep -i "kind"
+kind: Pod
+    kind: DaemonSet
+```
+
+Yes, it is deployed as `DaemonSets` across all the nodes.
+</details>
+
+-----
+
+### Cluster DNS
+
