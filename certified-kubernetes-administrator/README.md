@@ -9044,7 +9044,7 @@ I0124 12:52:21.311480       1 shared_informer.go:320] Caches are synced for endp
 I0124 12:52:21.311574       1 shared_informer.go:320] Caches are synced for service config
 ```
 
-From this logline: `Using iptables proxy` -> We could see that the kube-proxy is using the `iptables`.
+From this logline: `Using iptables proxy` -> We could see that the kube-proxy is using the `iptables proxy`.
 
 </details>
 
@@ -9062,4 +9062,46 @@ Yes, it is deployed as `DaemonSets` across all the nodes.
 -----
 
 ### Cluster DNS
+
+Let's see:
+
+- What names are assigned to what objects
+- Service DNS records
+- POD DNS records
+
+
+![creating_service_and_reaching_them_how_DNS_stores_it_1](creating_service_and_reaching_them_how_DNS_stores_it_1.png)
+
+It is the same way, it stores the details of the pods as well. Where, you can reach the service via: `https://webservice.apps.svc.cluster.local` but, for pods(if there is no services in front), we can reach to `https://testpod.default.pod.cluster.local`.
+
+![creating_service_and_reaching_them_how_DNS_stores_it_2](creating_service_and_reaching_them_how_DNS_stores_it_2.png)
+
+>[!Important]
+>Please note, for Pods, the DNS in K8s,  interchanges the IP address (dots) i.e. 10.244.2.5 to 10-244-2-5 replaced with (dashes) as `hostnames` in the DNS records.
+
+----
+
+### CoreDNS in Kubernetes
+
+#### How Kubernetes Implements DNS in the cluster
+
+Prior to the K8s v1.21, it was using the `kube-DNS`, but post that, to the latest versions, it started using the `coreDNS`.
+
+So, basically, all the configurations and plugins should be in the `/etc/coredns/Corefile`
+
+![coreDNS_corefile_plugin_for_kubernetes](coreDNS_corefile_plugin_for_kubernetes.png)
+
+Please note, once the CoreDNS is deployed, it is deployed as `ReplicaSets` so it can have redundancy. And, the `coreDNS pods` are available to serve the pods.
+
+Whenever a pod is deployed, the `kubelet` also includes a line in the `/etc/resolv.conf` as the `nameserver <coreDNS-internal-ip>`. This is because the `kubelet` is responsible to deploy the new pods and it'll take care of those.
+
+![coreDNS_for_kubernetes_for_pods](coreDNS_for_kubernetes_for_pods.png)
+
+**In Simple scenario** - If there are two pods in the `default` namespace, we can add both the pods IP address in the `/etc/hosts` with the `hostname` so that when we type `ping podB`, it can reach. But, when the cluster is scaled, it is NOT possible to do the same updation in each pods everytime, which is why, we have the `nameserver` in place. And, the coreDNS will take the responsibility of resolving the domain names for the pods when reached.
+
+##### Commands Used & Questions
+
+<details><summary>
+</summary>
+</details>
 
