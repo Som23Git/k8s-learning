@@ -9770,3 +9770,253 @@ The rewrite-target option is critical in scenarios where:
 
 ----
 
+##### Commands Used & Questions
+
+<details><summary>Q1: Inspect the deployment and its components</summary>
+
+```bash
+$ kubectl get all -A -o wide
+NAMESPACE       NAME                                            READY   STATUS      RESTARTS   AGE     IP                NODE           NOMINATED NODE   READINESS GATES
+app-space       pod/default-backend-5cd488d85c-r4trd            1/1     Running     0          34s     172.17.0.6        controlplane   <none>           <none>
+app-space       pod/webapp-video-cb475db9c-5b7lf                1/1     Running     0          34s     172.17.0.5        controlplane   <none>           <none>
+app-space       pod/webapp-wear-6886df6554-z8zhj                1/1     Running     0          34s     172.17.0.4        controlplane   <none>           <none>
+ingress-nginx   pod/ingress-nginx-admission-create-f522g        0/1     Completed   0          32s     172.17.0.7        controlplane   <none>           <none>
+ingress-nginx   pod/ingress-nginx-admission-patch-qd8wg         0/1     Completed   0          32s     172.17.0.8        controlplane   <none>           <none>
+ingress-nginx   pod/ingress-nginx-controller-7f45764b55-rcm5q   1/1     Running     0          32s     172.17.0.9        controlplane   <none>           <none>
+kube-flannel    pod/kube-flannel-ds-jwgt6                       1/1     Running     0          8m49s   192.168.100.139   controlplane   <none>           <none>
+kube-system     pod/coredns-77d6fd4654-8w9ns                    1/1     Running     0          8m49s   172.17.0.2        controlplane   <none>           <none>
+kube-system     pod/coredns-77d6fd4654-lzbr7                    1/1     Running     0          8m49s   172.17.0.3        controlplane   <none>           <none>
+kube-system     pod/etcd-controlplane                           1/1     Running     0          8m56s   192.168.100.139   controlplane   <none>           <none>
+kube-system     pod/kube-apiserver-controlplane                 1/1     Running     0          8m56s   192.168.100.139   controlplane   <none>           <none>
+kube-system     pod/kube-controller-manager-controlplane        1/1     Running     0          8m56s   192.168.100.139   controlplane   <none>           <none>
+kube-system     pod/kube-proxy-kzr8z                            1/1     Running     0          8m49s   192.168.100.139   controlplane   <none>           <none>
+kube-system     pod/kube-scheduler-controlplane                 1/1     Running     0          8m56s   192.168.100.139   controlplane   <none>           <none>
+
+NAMESPACE       NAME                                         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE     SELECTOR
+app-space       service/default-backend-service              ClusterIP   172.20.92.100    <none>        80/TCP                       34s     app=default-backend
+app-space       service/video-service                        ClusterIP   172.20.6.171     <none>        8080/TCP                     34s     app=webapp-video
+app-space       service/wear-service                         ClusterIP   172.20.34.5      <none>        8080/TCP                     34s     app=webapp-wear
+default         service/kubernetes                           ClusterIP   172.20.0.1       <none>        443/TCP                      8m57s   <none>
+ingress-nginx   service/ingress-nginx-controller             NodePort    172.20.125.247   <none>        80:30080/TCP,443:32103/TCP   33s     app.kubernetes.io/component=controller,app.kubernetes.io/instance=ingress-nginx,app.kubernetes.io/name=ingress-nginx
+ingress-nginx   service/ingress-nginx-controller-admission   ClusterIP   172.20.67.12     <none>        443/TCP                      33s     app.kubernetes.io/component=controller,app.kubernetes.io/instance=ingress-nginx,app.kubernetes.io/name=ingress-nginx
+kube-system     service/kube-dns                             ClusterIP   172.20.0.10      <none>        53/UDP,53/TCP,9153/TCP       8m56s   k8s-app=kube-dns
+
+NAMESPACE      NAME                             DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE     CONTAINERS     IMAGES                               SELECTOR
+kube-flannel   daemonset.apps/kube-flannel-ds   1         1         1       1            1           <none>                   8m55s   kube-flannel   docker.io/flannel/flannel:v0.23.0    app=flannel,k8s-app=flannel
+kube-system    daemonset.apps/kube-proxy        1         1         1       1            1           kubernetes.io/os=linux   8m56s   kube-proxy     registry.k8s.io/kube-proxy:v1.31.0   k8s-app=kube-proxy
+
+NAMESPACE       NAME                                       READY   UP-TO-DATE   AVAILABLE   AGE     CONTAINERS      IMAGES                                                                                                                    SELECTOR
+app-space       deployment.apps/default-backend            1/1     1            1           34s     simple-webapp   kodekloud/ecommerce:404                                                                                                   app=default-backend
+app-space       deployment.apps/webapp-video               1/1     1            1           34s     simple-webapp   kodekloud/ecommerce:video                                                                                                 app=webapp-video
+app-space       deployment.apps/webapp-wear                1/1     1            1           34s     simple-webapp   kodekloud/ecommerce:apparels                                                                                              app=webapp-wear
+ingress-nginx   deployment.apps/ingress-nginx-controller   1/1     1            1           32s     controller      registry.k8s.io/ingress-nginx/controller:v1.1.2@sha256:28b11ce69e57843de44e3db6413e98d09de0f6688e33d4bd384002a44f78405c   app.kubernetes.io/component=controller,app.kubernetes.io/instance=ingress-nginx,app.kubernetes.io/name=ingress-nginx
+kube-system     deployment.apps/coredns                    2/2     2            2           8m56s   coredns         registry.k8s.io/coredns/coredns:v1.10.1                                                                                   k8s-app=kube-dns
+
+NAMESPACE       NAME                                                  DESIRED   CURRENT   READY   AGE     CONTAINERS      IMAGES                                                                                                                    SELECTOR
+app-space       replicaset.apps/default-backend-5cd488d85c            1         1         1       34s     simple-webapp   kodekloud/ecommerce:404                                                                                                   app=default-backend,pod-template-hash=5cd488d85c
+app-space       replicaset.apps/webapp-video-cb475db9c                1         1         1       34s     simple-webapp   kodekloud/ecommerce:video                                                                                                 app=webapp-video,pod-template-hash=cb475db9c
+app-space       replicaset.apps/webapp-wear-6886df6554                1         1         1       34s     simple-webapp   kodekloud/ecommerce:apparels                                                                                              app=webapp-wear,pod-template-hash=6886df6554
+ingress-nginx   replicaset.apps/ingress-nginx-controller-7f45764b55   1         1         1       32s     controller      registry.k8s.io/ingress-nginx/controller:v1.1.2@sha256:28b11ce69e57843de44e3db6413e98d09de0f6688e33d4bd384002a44f78405c   app.kubernetes.io/component=controller,app.kubernetes.io/instance=ingress-nginx,app.kubernetes.io/name=ingress-nginx,pod-template-hash=7f45764b55
+kube-system     replicaset.apps/coredns-77d6fd4654                    2         2         2       8m49s   coredns         registry.k8s.io/coredns/coredns:v1.10.1                                                                                   k8s-app=kube-dns,pod-template-hash=77d6fd4654
+
+NAMESPACE       NAME                                       STATUS     COMPLETIONS   DURATION   AGE   CONTAINERS   IMAGES                                                                                                                              SELECTOR
+ingress-nginx   job.batch/ingress-nginx-admission-create   Complete   1/1           7s         32s   create       registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.1.1@sha256:64d8c73dca984af206adf9d6d7e46aa550362b1d7a01f3a0a91b20cc67868660   batch.kubernetes.io/controller-uid=b88f74ee-4392-4076-b70d-7d074744cbc7
+ingress-nginx   job.batch/ingress-nginx-admission-patch    Complete   1/1           7s         32s   patch        registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.1.1@sha256:64d8c73dca984af206adf9d6d7e46aa550362b1d7a01f3a0a91b20cc67868660   batch.kubernetes.io/controller-uid=97ba1663-253c-49af-b3d6-2ef5e473e5b7
+```
+
+</details>
+
+
+<details><summary>Q2: What is the name of the ingress resource and what is the namespace where it is allocated?</summary>
+
+```bash
+$ kubectl get ingress -A
+NAMESPACE   NAME                 CLASS    HOSTS   ADDRESS          PORTS   AGE
+app-space   ingress-wear-watch   <none>   *       172.20.125.247   80      13m
+```
+
+</details>
+
+<details><summary>Q3: What is the Host configured on the Ingress Resource? The host entry defines the domain name that users use to reach the application like www.google.com</summary>
+
+```bash
+$ kubectl get ingress ingress-wear-watch -n app-space -o yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  creationTimestamp: "2025-01-27T04:08:00Z"
+  generation: 1
+  name: ingress-wear-watch
+  namespace: app-space
+  resourceVersion: "1259"
+  uid: e5e2c41f-d1e7-40a9-81dd-9cc89aceb3d0
+spec:
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: wear-service
+            port:
+              number: 8080
+        path: /wear
+        pathType: Prefix
+      - backend:
+          service:
+            name: video-service
+            port:
+              number: 8080
+        path: /watch
+        pathType: Prefix
+status:
+  loadBalancer:
+    ingress:
+    - ip: 172.20.125.247
+```
+
+```bash
+$ kubectl describe ingress ingress-wear-watch -n app-space
+Name:             ingress-wear-watch
+Labels:           <none>
+Namespace:        app-space
+Address:          172.20.125.247
+Ingress Class:    <none>
+Default backend:  <default>
+Rules:
+  Host        Path  Backends
+  ----        ----  --------
+  *           
+              /wear    wear-service:8080 (172.17.0.4:8080)
+              /watch   video-service:8080 (172.17.0.5:8080)
+Annotations:  nginx.ingress.kubernetes.io/rewrite-target: /
+              nginx.ingress.kubernetes.io/ssl-redirect: false
+Events:
+  Type    Reason  Age                From                      Message
+  ----    ------  ----               ----                      -------
+  Normal  Sync    28m (x2 over 28m)  nginx-ingress-controller  Scheduled for sync
+  ```
+
+As we see here in the `describe` command, the `host` is set to `(*)` all.
+
+</details>
+
+--------
+
+![nginx_ingress_space_controller](nginx_ingress_space_controller.png)
+
+----------
+
+## :: Design and Install a Kubernetes Cluster
+
+----------
+
+### Design a Kubernetes Cluster
+
+![hosting_production_applications_design_gcp_aws_azure_conf_1](hosting_production_applications_design_gcp_aws_azure_conf_1.png)
+
+![hosting_production_applications_design_gcp_aws_azure_conf_2](hosting_production_applications_design_gcp_aws_azure_conf_2.png)
+
+![hosting_production_applications_design_gcp_aws_azure_conf_3](hosting_production_applications_design_gcp_aws_azure_conf_3.png)
+
+![hosting_production_applications_design_gcp_aws_azure_conf_4](hosting_production_applications_design_gcp_aws_azure_conf_4.png)
+
+-----
+
+### Choosing a Kubernetes Infrastructure
+
+turnkey solutions and hosted solutions
+
+![choosing_k8s_infra_1](choosing_k8s_infra_1.png)
+
+![choosing_k8s_infra_2](choosing_k8s_infra_2.png)
+
+------
+
+### HA in K8s Cluster
+
+Using multiple master nodes
+
+Master nodes hosts the controlplane components
+
+Using controller manager and scheduler -> Active and Standby approach
+Using API Server -> Active and Active approach
+Using ETCD Server -> Active and Active approach
+
+Stack topology:
+
+![etcd_high_availablility](etcd_high_availablility.png)
+
+External ETCD Topology
+
+![etcd_high_availablility_external_1](etcd_high_availablility_external_1.png)
+
+![etcd_high_availablility_external_2](etcd_high_availablility_external_2.png)
+
+Now, our design is improved from `1 master` and `2 worker` nodes to `2 master` + `load Balancer` and `2 worker` nodes.
+
+--------
+
+### ETCD in a HA Cluster
+
+![ETCD_HA_Cluster](ETCD_HA_Cluster.png)
+
+Which is easy to deploy and work well for now.
+
+Consider if there are 3 ETCD servers across the K8s cluster, 
+
+- **How will the Master is elected?**
+
+The master is elected by the 2 other nodes where, one is considered as `master`.
+
+- **How will the Writes happen when there are two writes as the same time?**
+
+![ETCD_HA_Cluster_Writes](ETCD_HA_Cluster_Writes.png)
+
+If you two writes at the same time, then the write operation in the `master` node is performed first. And then, the `worker node` will redirect the `write` request to the `master node` that it received so that the `master` node can process it again.
+
+Once, it is written in the `master node`, it is the responsibility of the `master node` to transfer the `copy` of the `write` request to other ETCD worker nodes as well.
+
+- **How does the master/election election takes place?**
+
+ETCD implements a `distributed consensus` RAFT-based election in a three-node cluster.
+
+**Recommendation**: Is to have minimum of `3 ETCD Servers` in a cluster for High Availability.
+
+![quorum_in_etcd_servers](quorum_in_etcd_servers.png)
+
+![design_using_HA_ETCD_servers](design_using_HA_ETCD_servers.png)
+
+-----
+
+### Installing the Kubernetes the HardWay
+
+Installing Kubernetes the hard way can help you gain a better understanding of putting together the different components manually.
+
+An optional series on this is available on our YouTube channel here:
+
+https://www.youtube.com/watch?v=uUupRagM7m0&list=PL2We04F3Y_41jYdadX55fdJplDvgNGENo
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/uUupRagM7m0?si=Wr8QlBUjqrRWZ5Xv" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+The GIT Repo for this tutorial can be found here: https://github.com/mmumshad/kubernetes-the-hard-way
+
+------
+
+### Installing Kubernetes in a kubeadm way:
+
+The vagrant file used in the next video is available here:
+
+https://github.com/kodekloudhub/certified-kubernetes-administrator-course
+
+Here’s the link to the documentation:
+
+https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
+
+------
+
+### Deploy a Kubeadm - Provision VMs with Vagrant
+
+
