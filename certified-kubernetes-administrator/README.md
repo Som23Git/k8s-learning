@@ -9647,6 +9647,126 @@ status:
   updatedReplicas: 1
 ```
 
-Updated the env variable of the `DB_HOST` to `mysql.payroll` instead of `mysql` because, this pod is in a different `namespace`.
+Updated the `env` variable of the `DB_HOST` to `mysql.payroll` instead of `mysql` because, this pod is in a different `namespace`.
 
 </details>
+
+------
+
+### Ingress
+
+**Very common question**
+
+Ingress Controller
+
+![ingress_controller_configuration](ingress_controller_configuration.png)
+
+Ingress Resources
+
+-----
+
+In this article, we will see what changes have been made in previous and current versions in Ingress.
+
+Like in apiVersion, serviceName and servicePort etc.
+
+Now, in `k8s version 1.20+`, we can create an Ingress resource in the imperative way like this:-
+
+```bash
+$ kubectl create ingress  --rule="host/path=service:port"
+```
+
+Example -
+
+```bash
+$ kubectl create ingress ingress-test --rule="wear.my-online-store.com/wear*=wear-service:80"
+```
+
+Find more information and examples in the below reference link:-**
+
+https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#-em-ingress-em- 
+
+References:-
+
+https://kubernetes.io/docs/concepts/services-networking/ingress
+
+https://kubernetes.io/docs/concepts/services-networking/ingress/#path-types
+
+-----
+
+How to use the **rewrite-target** annotation in the **NGINX Ingress controller** to modify the request URL before forwarding it to the backend service. This is essential when the backend applications are not configured to handle the custom path prefixes used in the incoming requests.
+
+### Key Points:
+
+1. **Scenario**:
+   - There are two backend services:
+     - A **watch** app for video streaming.
+     - A **wear** app for apparel browsing.
+   - Users access these services through specific URLs like:
+     - `http://<host>/watch` for the watch app.
+     - `http://<host>/wear` for the wear app.
+   - However, the backend applications don't expect the `/watch` or `/wear` paths in the URL. They only understand requests like `http://<host>/`.
+
+2. **Problem**:
+   - Without using the rewrite-target option, the paths `/watch` or `/wear` will be forwarded as-is to the backend. For example:
+     - Request: `http://<host>/watch` → Forwarded as `http://<backend>/watch`.
+     - This results in a **404 error** because the backend apps don’t recognize `/watch` or `/wear`.
+
+3. **Solution**:
+   - The **rewrite-target** annotation in the NGINX Ingress controller allows rewriting the incoming URL paths to match what the backend applications expect.
+   - For example:
+     - Rewrite `http://<host>/watch` to `http://<backend>/`.
+     - Rewrite `http://<host>/wear` to `http://<backend>/`.
+
+4. **How it Works**:
+   - The rewrite-target value replaces the portion of the URL under the `rules->http->paths->path` in the Ingress resource.
+   - Example configuration:
+     ```yaml
+     apiVersion: extensions/v1beta1
+     kind: Ingress
+     metadata:
+       name: test-ingress
+       namespace: critical-space
+       annotations:
+         nginx.ingress.kubernetes.io/rewrite-target: /
+     spec:
+       rules:
+       - http:
+           paths:
+           - path: /watch
+             backend:
+               serviceName: watch-service
+               servicePort: 8282
+     ```
+   - This setup ensures that `http://<host>/watch` is rewritten to `http://<backend>/`.
+
+5. **Advanced Example**:
+   - The rewrite-target annotation can also use **regular expressions** for more flexible rewrites.
+   - Example:
+     ```yaml
+     apiVersion: extensions/v1beta1
+     kind: Ingress
+     metadata:
+       annotations:
+         nginx.ingress.kubernetes.io/rewrite-target: /$2
+       name: rewrite
+       namespace: default
+     spec:
+       rules:
+       - host: rewrite.bar.com
+         http:
+           paths:
+           - path: /something(/|$)(.*)
+             backend:
+               serviceName: http-svc
+               servicePort: 80
+     ```
+   - This rule rewrites `http://<host>/something/foo` to `http://<backend>/foo`.
+
+### Why is this Important?
+The rewrite-target option is critical in scenarios where:
+- The incoming URLs need to include user-friendly paths (`/watch`, `/wear`).
+- The backend applications cannot handle these custom paths directly.
+- This ensures seamless integration between user-facing URLs and backend services, avoiding errors like 404s.
+
+----
+
