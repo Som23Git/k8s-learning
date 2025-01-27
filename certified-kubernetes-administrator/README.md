@@ -10020,3 +10020,36 @@ https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-ku
 ### Deploy a Kubeadm - Provision VMs with Vagrant
 
 
+For Prerequisites:
+
+How to run the Vagrant and the virtualization box using QEMU in MacOS Silicon Chip M1:
+
+Follow this Medium article: https://joachim8675309.medium.com/vagrant-with-macbook-mx-arm64-0f590fd7e48a.
+
+```bash
+# install VM solution
+$ brew install qemu
+
+# install Vagrant with QEMU support
+$ brew install --cask vagrant
+$ vagrant plugin install vagrant-qemu
+
+# If any virtualization provider is installed already
+$ vagrant destroy -f
+
+# create configuration file for arm64 vm image
+$ cat <<EOF > Vagrantfile
+Vagrant.configure("2") do |config|
+  config.vm.box = "perk/ubuntu-2204-arm64"
+  config.vm.provider "qemu" do |qe|
+    qe.ssh_port = "50022" # change ssh port as needed
+  end
+end
+EOF
+
+# download and startup VM using hvf
+$ vagrant up --provider=qemu
+
+# log into the VM
+$ vagrant ssh
+```
