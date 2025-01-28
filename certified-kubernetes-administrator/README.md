@@ -9044,7 +9044,7 @@ I0124 12:52:21.311480       1 shared_informer.go:320] Caches are synced for endp
 I0124 12:52:21.311574       1 shared_informer.go:320] Caches are synced for service config
 ```
 
-From this logline: `Using iptables proxy` -> We could see that the kube-proxy is using the `iptables`.
+From this logline: `Using iptables proxy` -> We could see that the kube-proxy is using the `iptables proxy`.
 
 </details>
 
@@ -9063,3 +9063,1430 @@ Yes, it is deployed as `DaemonSets` across all the nodes.
 
 ### Cluster DNS
 
+Let's see:
+
+- What names are assigned to what objects
+- Service DNS records
+- POD DNS records
+
+
+![creating_service_and_reaching_them_how_DNS_stores_it_1](creating_service_and_reaching_them_how_DNS_stores_it_1.png)
+
+It is the same way, it stores the details of the pods as well. Where, you can reach the service via: `https://webservice.apps.svc.cluster.local` but, for pods(if there is no services in front), we can reach to `https://testpod.default.pod.cluster.local`.
+
+![creating_service_and_reaching_them_how_DNS_stores_it_2](creating_service_and_reaching_them_how_DNS_stores_it_2.png)
+
+>[!Important]
+>Please note, for Pods, the DNS in K8s,  interchanges the IP address (dots) i.e. 10.244.2.5 to 10-244-2-5 replaced with (dashes) as `hostnames` in the DNS records.
+
+----
+
+### CoreDNS in Kubernetes
+
+#### How Kubernetes Implements DNS in the cluster
+
+Prior to the K8s v1.21, it was using the `kube-DNS`, but post that, to the latest versions, it started using the `coreDNS`.
+
+So, basically, all the configurations and plugins should be in the `/etc/coredns/Corefile`
+
+![coreDNS_corefile_plugin_for_kubernetes](coreDNS_corefile_plugin_for_kubernetes.png)
+
+Please note, once the CoreDNS is deployed, it is deployed as `ReplicaSets` so it can have redundancy. And, the `coreDNS pods` are available to serve the pods.
+
+Whenever a pod is deployed, the `kubelet` also includes a line in the `/etc/resolv.conf` as the `nameserver <coreDNS-internal-ip>`. This is because the `kubelet` is responsible to deploy the new pods and it'll take care of those.
+
+![coreDNS_for_kubernetes_for_pods](coreDNS_for_kubernetes_for_pods.png)
+
+**In Simple scenario** - If there are two pods in the `default` namespace, we can add both the pods IP address in the `/etc/hosts` with the `hostname` so that when we type `ping podB`, it can reach. But, when the cluster is scaled, it is NOT possible to do the same updation in each pods everytime, which is why, we have the `nameserver` in place. And, the coreDNS will take the responsibility of resolving the domain names for the pods when reached.
+
+##### Commands Used & Questions
+
+<details><summary>Q1: Identify the DNS solution implemented in this cluster.</summary>
+
+```bash
+$ kubectl get rs,pvc,pv,rs,deploy,pods -A
+NAMESPACE     NAME                                 DESIRED   CURRENT   READY   AGE
+kube-system   replicaset.apps/coredns-77d6fd4654   2         2         2       7m6s
+
+NAMESPACE     NAME                      READY   UP-TO-DATE   AVAILABLE   AGE
+kube-system   deployment.apps/coredns   2/2     2            2           7m11s
+
+NAMESPACE      NAME                                       READY   STATUS    RESTARTS   AGE
+default        pod/hr                                     1/1     Running   0          112s
+default        pod/simple-webapp-1                        1/1     Running   0          100s
+default        pod/test                                   1/1     Running   0          112s
+kube-flannel   pod/kube-flannel-ds-4qg2g                  1/1     Running   0          7m5s
+kube-system    pod/coredns-77d6fd4654-c6lk6               1/1     Running   0          7m5s
+kube-system    pod/coredns-77d6fd4654-l9fp2               1/1     Running   0          7m5s
+kube-system    pod/etcd-controlplane                      1/1     Running   0          7m11s
+kube-system    pod/kube-apiserver-controlplane            1/1     Running   0          7m11s
+kube-system    pod/kube-controller-manager-controlplane   1/1     Running   0          7m11s
+kube-system    pod/kube-proxy-dtb56                       1/1     Running   0          7m5s
+kube-system    pod/kube-scheduler-controlplane            1/1     Running   0          7m11s
+payroll        pod/web                                    1/1     Running   0          112s
+```
+
+There is a `service/kube-dns` in the cluster, so checking that:
+
+```bash
+kubectl get service/kube-dns -n kube-system -o yaml
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{"prometheus.io/port":"9153","prometheus.io/scrape":"true"},"labels":{"k8s-app":"kube-dns","kubernetes.io/cluster-service":"true","kubernetes.io/name":"CoreDNS"},"name":"kube-dns","namespace":"kube-system","resourceVersion":"0"},"spec":{"clusterIP":"172.20.0.10","ports":[{"name":"dns","port":53,"protocol":"UDP","targetPort":53},{"name":"dns-tcp","port":53,"protocol":"TCP","targetPort":53},{"name":"metrics","port":9153,"protocol":"TCP","targetPort":9153}],"selector":{"k8s-app":"kube-dns"}}}
+    prometheus.io/port: "9153"
+    prometheus.io/scrape: "true"
+  creationTimestamp: "2025-01-27T02:26:41Z"
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: CoreDNS
+  name: kube-dns
+  namespace: kube-system
+  resourceVersion: "278"
+  uid: cfd84c5d-7999-49a1-96dd-1c002d923056
+spec:
+  clusterIP: 172.20.0.10
+  clusterIPs:
+  - 172.20.0.10
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: dns
+    port: 53
+    protocol: UDP
+    targetPort: 53
+  - name: dns-tcp
+    port: 53
+    protocol: TCP
+    targetPort: 53
+  - name: metrics
+    port: 9153
+    protocol: TCP
+    targetPort: 9153
+  selector:
+    k8s-app: kube-dns
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}
+```
+Under labels, `kubernetes.io/name: CoreDNS` - this clearly states that the CoreDNS is used.
+
+</details>
+
+<details><summary>Q2: How is the Corefile passed into the CoreDNS POD?</summary>
+
+```bash
+$ ps -aux | grep coredns
+root        5956  0.0  0.0 765680 48224 ?        Ssl  02:27   0:00 /coredns -conf /etc/coredns/Corefile
+root        6390  0.0  0.0 766192 47772 ?        Ssl  02:27   0:00 /coredns -conf /etc/coredns/Corefile
+root       13720  0.0  0.0   6800  2352 pts/2    S+   02:39   0:00 grep --color=auto coredns
+```
+Seems like the `/etc/core/Corefile` is passed as an arguments.
+
+But, let's check the pod configuration itself:
+
+```yaml
+$ kubectl get deployments.apps coredns -n kube-system -o yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"k8s-app":"kube-dns"},"name":"coredns","namespace":"kube-system"},"spec":{"replicas":2,"selector":{"matchLabels":{"k8s-app":"kube-dns"}},"strategy":{"rollingUpdate":{"maxUnavailable":1},"type":"RollingUpdate"},"template":{"metadata":{"labels":{"k8s-app":"kube-dns"}},"spec":{"affinity":{"podAntiAffinity":{"preferredDuringSchedulingIgnoredDuringExecution":[{"podAffinityTerm":{"labelSelector":{"matchExpressions":[{"key":"k8s-app","operator":"In","values":["kube-dns"]}]},"topologyKey":"kubernetes.io/hostname"},"weight":100}]}},"containers":[{"args":["-conf","/etc/coredns/Corefile"],"image":"registry.k8s.io/coredns/coredns:v1.10.1","imagePullPolicy":"IfNotPresent","livenessProbe":{"failureThreshold":5,"httpGet":{"path":"/health","port":8080,"scheme":"HTTP"},"initialDelaySeconds":60,"successThreshold":1,"timeoutSeconds":5},"name":"coredns","ports":[{"containerPort":53,"name":"dns","protocol":"UDP"},{"containerPort":53,"name":"dns-tcp","protocol":"TCP"},{"containerPort":9153,"name":"metrics","protocol":"TCP"}],"readinessProbe":{"httpGet":{"path":"/ready","port":8181,"scheme":"HTTP"}},"resources":{"limits":{"memory":"170Mi"},"requests":{"cpu":"100m","memory":"70Mi"}},"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"add":["NET_BIND_SERVICE"],"drop":["ALL"]},"readOnlyRootFilesystem":true},"volumeMounts":[{"mountPath":"/etc/coredns","name":"config-volume","readOnly":true}]}],"dnsPolicy":"Default","nodeSelector":{"kubernetes.io/os":"linux"},"priorityClassName":"system-cluster-critical","serviceAccountName":"coredns","tolerations":[{"key":"CriticalAddonsOnly","operator":"Exists"},{"effect":"NoSchedule","key":"node-role.kubernetes.io/control-plane"}],"volumes":[{"configMap":{"items":[{"key":"Corefile","path":"Corefile"}],"name":"coredns"},"name":"config-volume"}]}}}}
+  creationTimestamp: "2025-01-27T02:26:41Z"
+  generation: 2
+  labels:
+    k8s-app: kube-dns
+  name: coredns
+  namespace: kube-system
+  resourceVersion: "445"
+  uid: 2e7f20af-046d-460c-915f-5f5915777977
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 2
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      k8s-app: kube-dns
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        k8s-app: kube-dns
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: k8s-app
+                  operator: In
+                  values:
+                  - kube-dns
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+      containers:
+      - args:
+        - -conf
+        - /etc/coredns/Corefile
+        image: registry.k8s.io/coredns/coredns:v1.10.1
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        name: coredns
+        ports:
+        - containerPort: 53
+          name: dns
+          protocol: UDP
+        - containerPort: 53
+          name: dns-tcp
+          protocol: TCP
+        - containerPort: 9153
+          name: metrics
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /ready
+            port: 8181
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          limits:
+            memory: 170Mi
+          requests:
+            cpu: 100m
+            memory: 70Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add:
+            - NET_BIND_SERVICE
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/coredns
+          name: config-volume
+          readOnly: true
+      dnsPolicy: Default
+      nodeSelector:
+        kubernetes.io/os: linux
+      priorityClassName: system-cluster-critical
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: coredns
+      serviceAccountName: coredns
+      terminationGracePeriodSeconds: 30
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
+      volumes:
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: Corefile
+            path: Corefile
+          name: coredns
+        name: config-volume
+status:
+  availableReplicas: 2
+  conditions:
+  - lastTransitionTime: "2025-01-27T02:27:02Z"
+    lastUpdateTime: "2025-01-27T02:27:02Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2025-01-27T02:26:46Z"
+    lastUpdateTime: "2025-01-27T02:27:05Z"
+    message: ReplicaSet "coredns-77d6fd4654" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 2
+  readyReplicas: 2
+  replicas: 2
+  updatedReplicas: 2
+```
+It is clear that the configuration of the coreDNS is passed via the `configMap` as you see the `volumeMount` and `volumes` are used pointing to the name of the `configMap object`.
+
+```yaml
+      volumes:
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: Corefile
+            path: Corefile
+          name: coredns
+        name: config-volume
+```
+
+See, the configMap is mentioned here and the volume name is `config-volume` where the `configMap` is stored. 
+
+Now, the `config-volume` is mounted inside the pod here:
+
+```yaml
+        volumeMounts:
+        - mountPath: /etc/coredns
+          name: config-volume
+          readOnly: true
+```
+
+And, finally the files are passed here:
+
+```yaml
+      containers:
+      - args:
+        - -conf
+        - /etc/coredns/Corefile
+```
+</details>
+
+<details><summary>Q3: What name can be used to access the hr web server from the test Application? You can execute a curl command on the test pod to test. Alternatively, the test Application also has a UI. Access it using the tab at the top of your terminal named test-app.</summary>
+
+```bash
+$ kubectl get all -n payroll -o wide
+NAME      READY   STATUS    RESTARTS   AGE   IP           NODE           NOMINATED NODE   READINESS GATES
+pod/web   1/1     Running   0          18m   172.17.0.4   controlplane   <none>           <none>
+
+NAME                  TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE   SELECTOR
+service/web-service   ClusterIP   172.20.103.81   <none>        80/TCP    18m   name=web
+
+$ kubectl get all -n kube-system -o wide
+NAME                                       READY   STATUS    RESTARTS   AGE   IP                NODE           NOMINATED NODE   READINESS GATES
+pod/coredns-77d6fd4654-c6lk6               1/1     Running   0          24m   172.17.0.2        controlplane   <none>           <none>
+pod/coredns-77d6fd4654-l9fp2               1/1     Running   0          24m   172.17.0.3        controlplane   <none>           <none>
+pod/etcd-controlplane                      1/1     Running   0          24m   192.168.233.144   controlplane   <none>           <none>
+pod/kube-apiserver-controlplane            1/1     Running   0          24m   192.168.233.144   controlplane   <none>           <none>
+pod/kube-controller-manager-controlplane   1/1     Running   0          24m   192.168.233.144   controlplane   <none>           <none>
+pod/kube-proxy-dtb56                       1/1     Running   0          24m   192.168.233.144   controlplane   <none>           <none>
+pod/kube-scheduler-controlplane            1/1     Running   0          24m   192.168.233.144   controlplane   <none>           <none>
+
+NAME               TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)                  AGE   SELECTOR
+service/kube-dns   ClusterIP   172.20.0.10   <none>        53/UDP,53/TCP,9153/TCP   24m   k8s-app=kube-dns
+
+NAME                        DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE   CONTAINERS   IMAGES                               SELECTOR
+daemonset.apps/kube-proxy   1         1         1       1            1           kubernetes.io/os=linux   24m   kube-proxy   registry.k8s.io/kube-proxy:v1.31.0   k8s-app=kube-proxy
+
+NAME                      READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES                                    SELECTOR
+deployment.apps/coredns   2/2     2            2           24m   coredns      registry.k8s.io/coredns/coredns:v1.10.1   k8s-app=kube-dns
+
+NAME                                 DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES                                    SELECTOR
+replicaset.apps/coredns-77d6fd4654   2         2         2       24m   coredns      registry.k8s.io/coredns/coredns:v1.10.1   k8s-app=kube-dns,pod-template-hash=77d6fd4654
+
+
+$ kubectl get all -n default -o wide
+NAME                  READY   STATUS    RESTARTS   AGE   IP           NODE           NOMINATED NODE   READINESS GATES
+pod/hr                1/1     Running   0          20m   172.17.0.5   controlplane   <none>           <none>
+pod/simple-webapp-1   1/1     Running   0          20m   172.17.0.7   controlplane   <none>           <none>
+pod/test              1/1     Running   0          20m   172.17.0.6   controlplane   <none>           <none>
+
+NAME                   TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE   SELECTOR
+service/kubernetes     ClusterIP   172.20.0.1       <none>        443/TCP        25m   <none>
+service/test-service   NodePort    172.20.249.78    <none>        80:30080/TCP   20m   name=test
+service/web-service    ClusterIP   172.20.238.253   <none>        80/TCP         20m   name=hr
+```
+
+From the above `service output`, we could see that the selector is pointing to an HR app: `name=hr` so, basically the `HR pod` has a `service/web-service` in front so we should be able to reach that service.
+
+When running a `kubectl exec`, we could see the below outputs:
+
+```bash
+$ kubectl exec pod/test -it -- nslookup web-service
+nslookup: can't resolve '(null)': Name does not resolve
+
+Name:      web-service
+Address 1: 172.20.238.253 web-service.default.svc.cluster.local
+
+$ kubectl exec pod/test -it -- curl web-service
+This is the HR server!
+```
+So, in short, we can reach the HR service or HR pod using the `web-service`.
+</details>
+
+<details><summary>
+Q4: Which of the below name can be used to access the payroll service from the test application?
+</summary>
+
+```bash
+$ kubectl get all -n payroll -o wide
+NAME      READY   STATUS    RESTARTS   AGE   IP           NODE           NOMINATED NODE   READINESS GATES
+pod/web   1/1     Running   0          18m   172.17.0.4   controlplane   <none>           <none>
+
+NAME                  TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE   SELECTOR
+service/web-service   ClusterIP   172.20.103.81   <none>        80/TCP    18m   name=web
+
+$ kubectl get all -n kube-system -o wide
+NAME                                       READY   STATUS    RESTARTS   AGE   IP                NODE           NOMINATED NODE   READINESS GATES
+pod/coredns-77d6fd4654-c6lk6               1/1     Running   0          24m   172.17.0.2        controlplane   <none>           <none>
+pod/coredns-77d6fd4654-l9fp2               1/1     Running   0          24m   172.17.0.3        controlplane   <none>           <none>
+pod/etcd-controlplane                      1/1     Running   0          24m   192.168.233.144   controlplane   <none>           <none>
+pod/kube-apiserver-controlplane            1/1     Running   0          24m   192.168.233.144   controlplane   <none>           <none>
+pod/kube-controller-manager-controlplane   1/1     Running   0          24m   192.168.233.144   controlplane   <none>           <none>
+pod/kube-proxy-dtb56                       1/1     Running   0          24m   192.168.233.144   controlplane   <none>           <none>
+pod/kube-scheduler-controlplane            1/1     Running   0          24m   192.168.233.144   controlplane   <none>           <none>
+
+NAME               TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)                  AGE   SELECTOR
+service/kube-dns   ClusterIP   172.20.0.10   <none>        53/UDP,53/TCP,9153/TCP   24m   k8s-app=kube-dns
+
+NAME                        DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE   CONTAINERS   IMAGES                               SELECTOR
+daemonset.apps/kube-proxy   1         1         1       1            1           kubernetes.io/os=linux   24m   kube-proxy   registry.k8s.io/kube-proxy:v1.31.0   k8s-app=kube-proxy
+
+NAME                      READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES                                    SELECTOR
+deployment.apps/coredns   2/2     2            2           24m   coredns      registry.k8s.io/coredns/coredns:v1.10.1   k8s-app=kube-dns
+
+NAME                                 DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES                                    SELECTOR
+replicaset.apps/coredns-77d6fd4654   2         2         2       24m   coredns      registry.k8s.io/coredns/coredns:v1.10.1   k8s-app=kube-dns,pod-template-hash=77d6fd4654
+
+
+$ kubectl get all -n default -o wide
+NAME                  READY   STATUS    RESTARTS   AGE   IP           NODE           NOMINATED NODE   READINESS GATES
+pod/hr                1/1     Running   0          20m   172.17.0.5   controlplane   <none>           <none>
+pod/simple-webapp-1   1/1     Running   0          20m   172.17.0.7   controlplane   <none>           <none>
+pod/test              1/1     Running   0          20m   172.17.0.6   controlplane   <none>           <none>
+
+NAME                   TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE   SELECTOR
+service/kubernetes     ClusterIP   172.20.0.1       <none>        443/TCP        25m   <none>
+service/test-service   NodePort    172.20.249.78    <none>        80:30080/TCP   20m   name=test
+service/web-service    ClusterIP   172.20.238.253   <none>        80/TCP         20m   name=hr
+```
+
+If you note something, there are two `service/web-service` but there are on a different namespace i.e. one in `Payroll` and the another one is in `Default`.
+
+```bash
+$ kubectl get svc -n payroll -o wide
+NAME                  TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE   SELECTOR
+service/web-service   ClusterIP   172.20.103.81   <none>        80/TCP    18m   name=web
+
+$ kubectl get svc -n default -o wide
+NAME                   TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE   SELECTOR
+service/web-service    ClusterIP   172.20.238.253   <none>        80/TCP         20m   name=hr
+```
+
+So, let's try the `exec` now:
+
+```bash
+$ kubectl exec pod/test -it -- ping web-service.payroll.svc.cluster.local
+PING web-service.payroll.svc.cluster.local (172.20.103.81): 56 data bytes
+
+--- web-service.payroll.svc.cluster.local ping statistics ---
+7 packets transmitted, 0 packets received, 100% packet loss
+command terminated with exit code 1
+
+$ kubectl exec pod/test -it -- curl web-service.payroll.svc.cluster.local
+ This is the PayRoll server!
+```
+So, when run a `ping` command, it tells us that whether it is resolving the specified hostname `web-service.payroll.svc.cluster.local` and the IP address `172.20.103.81`. Where, you see both are right.
+
+Now, running a `curl` works:
+
+`kubectl exec pod/test -it -- curl web-service.payroll.svc.cluster.local`
+
+</details>
+
+<details><summary>
+Q5: We just deployed a web server - webapp - that accesses a database mysql - server. However the web server is failing to connect to the database server. Troubleshoot and fix the issue.
+They could be in different namespaces. First locate the applications. The web server interface can be seen by clicking the tab Web Server at the top of your terminal.
+</summary>
+
+```bash
+kubectl get all -A -o wide
+NAMESPACE      NAME                                       READY   STATUS    RESTARTS   AGE     IP                NODE           NOMINATED NODE   READINESS GATES
+default        pod/hr                                     1/1     Running   0          42m     172.17.0.5        controlplane   <none>           <none>
+default        pod/simple-webapp-1                        1/1     Running   0          42m     172.17.0.7        controlplane   <none>           <none>
+default        pod/test                                   1/1     Running   0          42m     172.17.0.6        controlplane   <none>           <none>
+default        pod/webapp-6c9b6dccfb-67mq7                1/1     Running   0          4m55s   172.17.0.8        controlplane   <none>           <none>
+kube-flannel   pod/kube-flannel-ds-4qg2g                  1/1     Running   0          47m     192.168.233.144   controlplane   <none>           <none>
+kube-system    pod/coredns-77d6fd4654-c6lk6               1/1     Running   0          47m     172.17.0.2        controlplane   <none>           <none>
+kube-system    pod/coredns-77d6fd4654-l9fp2               1/1     Running   0          47m     172.17.0.3        controlplane   <none>           <none>
+kube-system    pod/etcd-controlplane                      1/1     Running   0          47m     192.168.233.144   controlplane   <none>           <none>
+kube-system    pod/kube-apiserver-controlplane            1/1     Running   0          47m     192.168.233.144   controlplane   <none>           <none>
+kube-system    pod/kube-controller-manager-controlplane   1/1     Running   0          47m     192.168.233.144   controlplane   <none>           <none>
+kube-system    pod/kube-proxy-dtb56                       1/1     Running   0          47m     192.168.233.144   controlplane   <none>           <none>
+kube-system    pod/kube-scheduler-controlplane            1/1     Running   0          47m     192.168.233.144   controlplane   <none>           <none>
+payroll        pod/mysql                                  1/1     Running   0          4m55s   172.17.0.9        controlplane   <none>           <none>
+payroll        pod/web                                    1/1     Running   0          42m     172.17.0.4        controlplane   <none>           <none>
+
+NAMESPACE     NAME                     TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                  AGE     SELECTOR
+default       service/kubernetes       ClusterIP   172.20.0.1       <none>        443/TCP                  47m     <none>
+default       service/test-service     NodePort    172.20.249.78    <none>        80:30080/TCP             42m     name=test
+default       service/web-service      ClusterIP   172.20.238.253   <none>        80/TCP                   42m     name=hr
+default       service/webapp-service   NodePort    172.20.129.82    <none>        8080:30082/TCP           4m55s   name=webapp
+kube-system   service/kube-dns         ClusterIP   172.20.0.10      <none>        53/UDP,53/TCP,9153/TCP   47m     k8s-app=kube-dns
+payroll       service/mysql            ClusterIP   172.20.75.64     <none>        3306/TCP                 4m55s   name=mysql
+payroll       service/web-service      ClusterIP   172.20.103.81    <none>        80/TCP                   42m     name=web
+
+NAMESPACE      NAME                             DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE   CONTAINERS     IMAGES                               SELECTOR
+kube-flannel   daemonset.apps/kube-flannel-ds   1         1         1       1            1           <none>                   47m   kube-flannel   docker.io/flannel/flannel:v0.23.0    app=flannel,k8s-app=flannel
+kube-system    daemonset.apps/kube-proxy        1         1         1       1            1           kubernetes.io/os=linux   47m   kube-proxy     registry.k8s.io/kube-proxy:v1.31.0   k8s-app=kube-proxy
+
+NAMESPACE     NAME                      READY   UP-TO-DATE   AVAILABLE   AGE     CONTAINERS            IMAGES                                    SELECTOR
+default       deployment.apps/webapp    1/1     1            1           4m55s   simple-webapp-mysql   mmumshad/simple-webapp-mysql              name=webapp
+kube-system   deployment.apps/coredns   2/2     2            2           47m     coredns               registry.k8s.io/coredns/coredns:v1.10.1   k8s-app=kube-dns
+
+NAMESPACE     NAME                                 DESIRED   CURRENT   READY   AGE     CONTAINERS            IMAGES                                    SELECTOR
+default       replicaset.apps/webapp-6c9b6dccfb    1         1         1       4m55s   simple-webapp-mysql   mmumshad/simple-webapp-mysql              name=webapp,pod-template-hash=6c9b6dccfb
+kube-system   replicaset.apps/coredns-77d6fd4654   2         2         2       47m     coredns               registry.k8s.io/coredns/coredns:v1.10.1   k8s-app=kube-dns,pod-template-hash=77d6fd4654
+```
+Let's try to ping the `mysql` 
+
+```bash
+kubectl exec pod/webapp-6c9b6dccfb-67mq7 -it -- ping mysql.payroll
+PING mysql.payroll (172.20.75.64): 56 data bytes
+^C
+--- mysql.payroll.svc ping statistics ---
+4 packets transmitted, 0 packets received, 100% packet loss
+command terminated with exit code 1
+```
+It seems like there is a `service` that is reaching from the `webapp-6c9b6dccfb` or in front of the `mysql` pod.
+
+So, when checking the `deployment
+
+```yaml
+$ kubectl get deployments.apps/webapp -o yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "2"
+  creationTimestamp: "2025-01-27T03:09:17Z"
+  generation: 2
+  labels:
+    name: webapp
+  name: webapp
+  namespace: default
+  resourceVersion: "4689"
+  uid: e1892888-e3ed-4144-9601-5b9757c6d119
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      name: webapp
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        name: webapp
+    spec:
+      containers:
+      - env:
+        - name: DB_Host
+          value: mysql.payroll
+        - name: DB_User
+          value: root
+        - name: DB_Password
+          value: paswrd
+        image: mmumshad/simple-webapp-mysql
+        imagePullPolicy: Always
+        name: simple-webapp-mysql
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2025-01-27T03:09:20Z"
+    lastUpdateTime: "2025-01-27T03:09:20Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2025-01-27T03:09:17Z"
+    lastUpdateTime: "2025-01-27T03:19:35Z"
+    message: ReplicaSet "webapp-f7ccb978f" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 2
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+```
+
+Updated the `env` variable of the `DB_HOST` to `mysql.payroll` instead of `mysql` because, this pod is in a different `namespace`.
+
+</details>
+
+------
+
+### Ingress
+
+**Very common question**
+
+Ingress Controller
+
+![ingress_controller_configuration](ingress_controller_configuration.png)
+
+Ingress Resources
+
+-----
+
+In this article, we will see what changes have been made in previous and current versions in Ingress.
+
+Like in apiVersion, serviceName and servicePort etc.
+
+Now, in `k8s version 1.20+`, we can create an Ingress resource in the imperative way like this:-
+
+```bash
+$ kubectl create ingress  --rule="host/path=service:port"
+```
+
+Example -
+
+```bash
+$ kubectl create ingress ingress-test --rule="wear.my-online-store.com/wear*=wear-service:80"
+```
+
+Find more information and examples in the below reference link:-**
+
+https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#-em-ingress-em- 
+
+References:-
+
+https://kubernetes.io/docs/concepts/services-networking/ingress
+
+https://kubernetes.io/docs/concepts/services-networking/ingress/#path-types
+
+-----
+
+How to use the **rewrite-target** annotation in the **NGINX Ingress controller** to modify the request URL before forwarding it to the backend service. This is essential when the backend applications are not configured to handle the custom path prefixes used in the incoming requests.
+
+### Key Points:
+
+1. **Scenario**:
+   - There are two backend services:
+     - A **watch** app for video streaming.
+     - A **wear** app for apparel browsing.
+   - Users access these services through specific URLs like:
+     - `http://<host>/watch` for the watch app.
+     - `http://<host>/wear` for the wear app.
+   - However, the backend applications don't expect the `/watch` or `/wear` paths in the URL. They only understand requests like `http://<host>/`.
+
+2. **Problem**:
+   - Without using the rewrite-target option, the paths `/watch` or `/wear` will be forwarded as-is to the backend. For example:
+     - Request: `http://<host>/watch` → Forwarded as `http://<backend>/watch`.
+     - This results in a **404 error** because the backend apps don’t recognize `/watch` or `/wear`.
+
+3. **Solution**:
+   - The **rewrite-target** annotation in the NGINX Ingress controller allows rewriting the incoming URL paths to match what the backend applications expect.
+   - For example:
+     - Rewrite `http://<host>/watch` to `http://<backend>/`.
+     - Rewrite `http://<host>/wear` to `http://<backend>/`.
+
+4. **How it Works**:
+   - The rewrite-target value replaces the portion of the URL under the `rules->http->paths->path` in the Ingress resource.
+   - Example configuration:
+     ```yaml
+     apiVersion: extensions/v1beta1
+     kind: Ingress
+     metadata:
+       name: test-ingress
+       namespace: critical-space
+       annotations:
+         nginx.ingress.kubernetes.io/rewrite-target: /
+     spec:
+       rules:
+       - http:
+           paths:
+           - path: /watch
+             backend:
+               serviceName: watch-service
+               servicePort: 8282
+     ```
+   - This setup ensures that `http://<host>/watch` is rewritten to `http://<backend>/`.
+
+5. **Advanced Example**:
+   - The rewrite-target annotation can also use **regular expressions** for more flexible rewrites.
+   - Example:
+     ```yaml
+     apiVersion: extensions/v1beta1
+     kind: Ingress
+     metadata:
+       annotations:
+         nginx.ingress.kubernetes.io/rewrite-target: /$2
+       name: rewrite
+       namespace: default
+     spec:
+       rules:
+       - host: rewrite.bar.com
+         http:
+           paths:
+           - path: /something(/|$)(.*)
+             backend:
+               serviceName: http-svc
+               servicePort: 80
+     ```
+   - This rule rewrites `http://<host>/something/foo` to `http://<backend>/foo`.
+
+### Why is this Important?
+The rewrite-target option is critical in scenarios where:
+- The incoming URLs need to include user-friendly paths (`/watch`, `/wear`).
+- The backend applications cannot handle these custom paths directly.
+- This ensures seamless integration between user-facing URLs and backend services, avoiding errors like 404s.
+
+----
+
+##### Commands Used & Questions
+
+<details><summary>Q1: Inspect the deployment and its components</summary>
+
+```bash
+$ kubectl get all -A -o wide
+NAMESPACE       NAME                                            READY   STATUS      RESTARTS   AGE     IP                NODE           NOMINATED NODE   READINESS GATES
+app-space       pod/default-backend-5cd488d85c-r4trd            1/1     Running     0          34s     172.17.0.6        controlplane   <none>           <none>
+app-space       pod/webapp-video-cb475db9c-5b7lf                1/1     Running     0          34s     172.17.0.5        controlplane   <none>           <none>
+app-space       pod/webapp-wear-6886df6554-z8zhj                1/1     Running     0          34s     172.17.0.4        controlplane   <none>           <none>
+ingress-nginx   pod/ingress-nginx-admission-create-f522g        0/1     Completed   0          32s     172.17.0.7        controlplane   <none>           <none>
+ingress-nginx   pod/ingress-nginx-admission-patch-qd8wg         0/1     Completed   0          32s     172.17.0.8        controlplane   <none>           <none>
+ingress-nginx   pod/ingress-nginx-controller-7f45764b55-rcm5q   1/1     Running     0          32s     172.17.0.9        controlplane   <none>           <none>
+kube-flannel    pod/kube-flannel-ds-jwgt6                       1/1     Running     0          8m49s   192.168.100.139   controlplane   <none>           <none>
+kube-system     pod/coredns-77d6fd4654-8w9ns                    1/1     Running     0          8m49s   172.17.0.2        controlplane   <none>           <none>
+kube-system     pod/coredns-77d6fd4654-lzbr7                    1/1     Running     0          8m49s   172.17.0.3        controlplane   <none>           <none>
+kube-system     pod/etcd-controlplane                           1/1     Running     0          8m56s   192.168.100.139   controlplane   <none>           <none>
+kube-system     pod/kube-apiserver-controlplane                 1/1     Running     0          8m56s   192.168.100.139   controlplane   <none>           <none>
+kube-system     pod/kube-controller-manager-controlplane        1/1     Running     0          8m56s   192.168.100.139   controlplane   <none>           <none>
+kube-system     pod/kube-proxy-kzr8z                            1/1     Running     0          8m49s   192.168.100.139   controlplane   <none>           <none>
+kube-system     pod/kube-scheduler-controlplane                 1/1     Running     0          8m56s   192.168.100.139   controlplane   <none>           <none>
+
+NAMESPACE       NAME                                         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE     SELECTOR
+app-space       service/default-backend-service              ClusterIP   172.20.92.100    <none>        80/TCP                       34s     app=default-backend
+app-space       service/video-service                        ClusterIP   172.20.6.171     <none>        8080/TCP                     34s     app=webapp-video
+app-space       service/wear-service                         ClusterIP   172.20.34.5      <none>        8080/TCP                     34s     app=webapp-wear
+default         service/kubernetes                           ClusterIP   172.20.0.1       <none>        443/TCP                      8m57s   <none>
+ingress-nginx   service/ingress-nginx-controller             NodePort    172.20.125.247   <none>        80:30080/TCP,443:32103/TCP   33s     app.kubernetes.io/component=controller,app.kubernetes.io/instance=ingress-nginx,app.kubernetes.io/name=ingress-nginx
+ingress-nginx   service/ingress-nginx-controller-admission   ClusterIP   172.20.67.12     <none>        443/TCP                      33s     app.kubernetes.io/component=controller,app.kubernetes.io/instance=ingress-nginx,app.kubernetes.io/name=ingress-nginx
+kube-system     service/kube-dns                             ClusterIP   172.20.0.10      <none>        53/UDP,53/TCP,9153/TCP       8m56s   k8s-app=kube-dns
+
+NAMESPACE      NAME                             DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE     CONTAINERS     IMAGES                               SELECTOR
+kube-flannel   daemonset.apps/kube-flannel-ds   1         1         1       1            1           <none>                   8m55s   kube-flannel   docker.io/flannel/flannel:v0.23.0    app=flannel,k8s-app=flannel
+kube-system    daemonset.apps/kube-proxy        1         1         1       1            1           kubernetes.io/os=linux   8m56s   kube-proxy     registry.k8s.io/kube-proxy:v1.31.0   k8s-app=kube-proxy
+
+NAMESPACE       NAME                                       READY   UP-TO-DATE   AVAILABLE   AGE     CONTAINERS      IMAGES                                                                                                                    SELECTOR
+app-space       deployment.apps/default-backend            1/1     1            1           34s     simple-webapp   kodekloud/ecommerce:404                                                                                                   app=default-backend
+app-space       deployment.apps/webapp-video               1/1     1            1           34s     simple-webapp   kodekloud/ecommerce:video                                                                                                 app=webapp-video
+app-space       deployment.apps/webapp-wear                1/1     1            1           34s     simple-webapp   kodekloud/ecommerce:apparels                                                                                              app=webapp-wear
+ingress-nginx   deployment.apps/ingress-nginx-controller   1/1     1            1           32s     controller      registry.k8s.io/ingress-nginx/controller:v1.1.2@sha256:28b11ce69e57843de44e3db6413e98d09de0f6688e33d4bd384002a44f78405c   app.kubernetes.io/component=controller,app.kubernetes.io/instance=ingress-nginx,app.kubernetes.io/name=ingress-nginx
+kube-system     deployment.apps/coredns                    2/2     2            2           8m56s   coredns         registry.k8s.io/coredns/coredns:v1.10.1                                                                                   k8s-app=kube-dns
+
+NAMESPACE       NAME                                                  DESIRED   CURRENT   READY   AGE     CONTAINERS      IMAGES                                                                                                                    SELECTOR
+app-space       replicaset.apps/default-backend-5cd488d85c            1         1         1       34s     simple-webapp   kodekloud/ecommerce:404                                                                                                   app=default-backend,pod-template-hash=5cd488d85c
+app-space       replicaset.apps/webapp-video-cb475db9c                1         1         1       34s     simple-webapp   kodekloud/ecommerce:video                                                                                                 app=webapp-video,pod-template-hash=cb475db9c
+app-space       replicaset.apps/webapp-wear-6886df6554                1         1         1       34s     simple-webapp   kodekloud/ecommerce:apparels                                                                                              app=webapp-wear,pod-template-hash=6886df6554
+ingress-nginx   replicaset.apps/ingress-nginx-controller-7f45764b55   1         1         1       32s     controller      registry.k8s.io/ingress-nginx/controller:v1.1.2@sha256:28b11ce69e57843de44e3db6413e98d09de0f6688e33d4bd384002a44f78405c   app.kubernetes.io/component=controller,app.kubernetes.io/instance=ingress-nginx,app.kubernetes.io/name=ingress-nginx,pod-template-hash=7f45764b55
+kube-system     replicaset.apps/coredns-77d6fd4654                    2         2         2       8m49s   coredns         registry.k8s.io/coredns/coredns:v1.10.1                                                                                   k8s-app=kube-dns,pod-template-hash=77d6fd4654
+
+NAMESPACE       NAME                                       STATUS     COMPLETIONS   DURATION   AGE   CONTAINERS   IMAGES                                                                                                                              SELECTOR
+ingress-nginx   job.batch/ingress-nginx-admission-create   Complete   1/1           7s         32s   create       registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.1.1@sha256:64d8c73dca984af206adf9d6d7e46aa550362b1d7a01f3a0a91b20cc67868660   batch.kubernetes.io/controller-uid=b88f74ee-4392-4076-b70d-7d074744cbc7
+ingress-nginx   job.batch/ingress-nginx-admission-patch    Complete   1/1           7s         32s   patch        registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.1.1@sha256:64d8c73dca984af206adf9d6d7e46aa550362b1d7a01f3a0a91b20cc67868660   batch.kubernetes.io/controller-uid=97ba1663-253c-49af-b3d6-2ef5e473e5b7
+```
+
+</details>
+
+
+<details><summary>Q2: What is the name of the ingress resource and what is the namespace where it is allocated?</summary>
+
+```bash
+$ kubectl get ingress -A
+NAMESPACE   NAME                 CLASS    HOSTS   ADDRESS          PORTS   AGE
+app-space   ingress-wear-watch   <none>   *       172.20.125.247   80      13m
+```
+
+</details>
+
+<details><summary>Q3: What is the Host configured on the Ingress Resource? The host entry defines the domain name that users use to reach the application like www.google.com</summary>
+
+```bash
+$ kubectl get ingress ingress-wear-watch -n app-space -o yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  creationTimestamp: "2025-01-27T04:08:00Z"
+  generation: 1
+  name: ingress-wear-watch
+  namespace: app-space
+  resourceVersion: "1259"
+  uid: e5e2c41f-d1e7-40a9-81dd-9cc89aceb3d0
+spec:
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: wear-service
+            port:
+              number: 8080
+        path: /wear
+        pathType: Prefix
+      - backend:
+          service:
+            name: video-service
+            port:
+              number: 8080
+        path: /watch
+        pathType: Prefix
+status:
+  loadBalancer:
+    ingress:
+    - ip: 172.20.125.247
+```
+
+```bash
+$ kubectl describe ingress ingress-wear-watch -n app-space
+Name:             ingress-wear-watch
+Labels:           <none>
+Namespace:        app-space
+Address:          172.20.125.247
+Ingress Class:    <none>
+Default backend:  <default>
+Rules:
+  Host        Path  Backends
+  ----        ----  --------
+  *           
+              /wear    wear-service:8080 (172.17.0.4:8080)
+              /watch   video-service:8080 (172.17.0.5:8080)
+Annotations:  nginx.ingress.kubernetes.io/rewrite-target: /
+              nginx.ingress.kubernetes.io/ssl-redirect: false
+Events:
+  Type    Reason  Age                From                      Message
+  ----    ------  ----               ----                      -------
+  Normal  Sync    28m (x2 over 28m)  nginx-ingress-controller  Scheduled for sync
+  ```
+
+As we see here in the `describe` command, the `host` is set to `(*)` all.
+
+</details>
+
+--------
+
+![nginx_ingress_space_controller](nginx_ingress_space_controller.png)
+
+----------
+
+## :: Design and Install a Kubernetes Cluster
+
+----------
+
+### Design a Kubernetes Cluster
+
+![hosting_production_applications_design_gcp_aws_azure_conf_1](hosting_production_applications_design_gcp_aws_azure_conf_1.png)
+
+![hosting_production_applications_design_gcp_aws_azure_conf_2](hosting_production_applications_design_gcp_aws_azure_conf_2.png)
+
+![hosting_production_applications_design_gcp_aws_azure_conf_3](hosting_production_applications_design_gcp_aws_azure_conf_3.png)
+
+![hosting_production_applications_design_gcp_aws_azure_conf_4](hosting_production_applications_design_gcp_aws_azure_conf_4.png)
+
+-----
+
+### Choosing a Kubernetes Infrastructure
+
+turnkey solutions and hosted solutions
+
+![choosing_k8s_infra_1](choosing_k8s_infra_1.png)
+
+![choosing_k8s_infra_2](choosing_k8s_infra_2.png)
+
+------
+
+### HA in K8s Cluster
+
+Using multiple master nodes
+
+Master nodes hosts the controlplane components
+
+Using controller manager and scheduler -> Active and Standby approach
+Using API Server -> Active and Active approach
+Using ETCD Server -> Active and Active approach
+
+Stack topology:
+
+![etcd_high_availablility](etcd_high_availablility.png)
+
+External ETCD Topology
+
+![etcd_high_availablility_external_1](etcd_high_availablility_external_1.png)
+
+![etcd_high_availablility_external_2](etcd_high_availablility_external_2.png)
+
+Now, our design is improved from `1 master` and `2 worker` nodes to `2 master` + `load Balancer` and `2 worker` nodes.
+
+--------
+
+### ETCD in a HA Cluster
+
+![ETCD_HA_Cluster](ETCD_HA_Cluster.png)
+
+Which is easy to deploy and work well for now.
+
+Consider if there are 3 ETCD servers across the K8s cluster, 
+
+- **How will the Master is elected?**
+
+The master is elected by the 2 other nodes where, one is considered as `master`.
+
+- **How will the Writes happen when there are two writes as the same time?**
+
+![ETCD_HA_Cluster_Writes](ETCD_HA_Cluster_Writes.png)
+
+If you two writes at the same time, then the write operation in the `master` node is performed first. And then, the `worker node` will redirect the `write` request to the `master node` that it received so that the `master` node can process it again.
+
+Once, it is written in the `master node`, it is the responsibility of the `master node` to transfer the `copy` of the `write` request to other ETCD worker nodes as well.
+
+- **How does the master/election election takes place?**
+
+ETCD implements a `distributed consensus` RAFT-based election in a three-node cluster.
+
+**Recommendation**: Is to have minimum of `3 ETCD Servers` in a cluster for High Availability.
+
+![quorum_in_etcd_servers](quorum_in_etcd_servers.png)
+
+![design_using_HA_ETCD_servers](design_using_HA_ETCD_servers.png)
+
+-----
+
+### Installing the Kubernetes the HardWay
+
+Installing Kubernetes the hard way can help you gain a better understanding of putting together the different components manually.
+
+An optional series on this is available on our YouTube channel here:
+
+https://www.youtube.com/watch?v=uUupRagM7m0&list=PL2We04F3Y_41jYdadX55fdJplDvgNGENo
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/uUupRagM7m0?si=Wr8QlBUjqrRWZ5Xv" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+The GIT Repo for this tutorial can be found here: https://github.com/mmumshad/kubernetes-the-hard-way
+
+------
+
+### Installing Kubernetes in a kubeadm way:
+
+The vagrant file used in the next video is available here:
+
+https://github.com/kodekloudhub/certified-kubernetes-administrator-course
+
+Here’s the link to the documentation:
+
+https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
+
+------
+
+### Deploy a Kubeadm - Provision VMs with Vagrant
+
+For Prerequisites:
+
+How to run the Vagrant and the virtualization box using QEMU in MacOS Silicon Chip M1:
+
+Follow this Medium article: https://joachim8675309.medium.com/vagrant-with-macbook-mx-arm64-0f590fd7e48a.
+
+```bash
+# install VM solution
+$ brew install qemu
+
+# install Vagrant with QEMU support
+$ brew install --cask vagrant
+$ vagrant plugin install vagrant-qemu
+
+# If any virtualization provider is installed already
+$ vagrant destroy -f
+
+# create configuration file for arm64 vm image
+$ cat <<EOF > Vagrantfile
+Vagrant.configure("2") do |config|
+  config.vm.box = "perk/ubuntu-2204-arm64"
+  config.vm.provider "qemu" do |qe|
+    qe.ssh_port = "50022" # change ssh port as needed
+  end
+end
+EOF
+
+# download and startup VM using hvf
+$ vagrant up --provider=qemu
+
+# log into the VM
+$ vagrant ssh
+```
+
+Please note, the MacOS M1 did not support virtualization as expected which led to `errors` related to `providers` while using `virtualbox` and the `qemu`.
+
+----------
+
+### Installing Kubeadm in the MacOS Silicon Chip(M1)
+
+#### Step 1
+  - Multipass - https://multipass.run/install. Follow the instructions to install it and check it is working properly. You should be able to successfully create a test Ubuntu VM following their instructions. Delete the test VM when you're done.
+  - JQ - https://github.com/stedolan/jq/wiki/Installation#macos
+
+----
+Let's do this:
+
+Download from here: https://canonical.com/multipass/install
+
+or
+
+Can use from the Terminal:
+
+```bash
+$ curl -L "https://github.com/canonical/multipass/releases/download/v1.15.0/multipass-1.15.0+mac-Darwin.pkg" -o multipass-1.15.0.pkg
+$ sudo installer -pkg multipass-1.15.0.pkg -target /
+```
+
+Or you can run the `pkg` via the UI itself from the `Finder`.
+
+To cross-verify whether the `multipass` installed successfully, follow the below commands:
+
+```bash
+# To create a VM named foo using multipass
+$ multipass launch --name foo
+
+# Once VM is created, to list the VMs:
+$ multipass list
+
+# To stop the VMs
+$ multipass stop foo
+```
+
+Then, install `jq`:
+
+```bash
+$ brew install jq
+```
+If no `brew`:
+
+```bash
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+#### Step 2
+
+The complete Credits should go to `kodekloud team` because they have created a script to deploy `ControlPlane`, `node01`, `node02` VMs using the `Multipass`.
+
+I followed this `Github` pretty-much, post that:
+
+```bash
+$ mkdir ~/kodekloud
+$ cd ~/kodekloud
+$ git clone https://github.com/kodekloudhub/certified-kubernetes-administrator-course.git
+$ cd certified-kubernetes-administrator-course/kubeadm-clusters/apple-silicon
+```
+
+Check whether the `multipass` working once again and run this script:
+
+```bash
+$ ./deploy-virtual-machines.sh
+
+# To debug(Recommended)
+$ bash -x deploy-virtual-machines.sh
+```
+
+I made one change to the `deploy-virtual-machines.sh` script:
+
+```yaml
+$ cat deploy-virtual-machines.sh
+59 # Determine interface for bridge
+- 60 interface=""
++ 60 interface="en0"
+61 bridge_arg="--bridged"
+```
+where the `interface` will be picked while the script is instantiated but, I explicitly provided it to use `en0` for my clarity.
+
+When you run the `bash -x .deploy-virtual-machines.sh`, you can clearly notice the commands performed by the `script`.
+
+```bash
+$ multipass launch $bridge_arg --disk 5G --memory $VM_MEM_GB --cpus 2 --name $node jammy 2
+```
+You can see that the script configuring 5 GB disk and 2 CPUs and the Memory gets calculated using this `MEM_GB=$(( $(sysctl hw.memsize | cut -d ' ' -f 2) /  1073741824 ))`. Simply gets your RAM and then, run through this condition:
+
+```bash
+VM_MEM_GB=3G
+
+if [ $MEM_GB -lt 8 ]
+then
+    echo -e "${RED}System RAM is ${MEM_GB}GB. This is insufficient to deploy a working cluster.${NC}"
+    exit 1
+fi
+
+if [ $MEM_GB -lt 16 ]
+then
+    echo -e "${YELLOW}System RAM is ${MEM_GB}GB. Deploying only one worker node.${NC}"
+    NUM_WORKER_NODES=1
+    VM_MEM_GB=2G
+    sleep 1
+fi
+```
+**RAM Allocates:**
+- 3 GB => System RAM is gt(greater than) 16 GB
+- 2 GB => System RAM is lt(less than) 16 GB
+- 1 GB => System RAM is lt(less than) 8 GB.
+
+Once your VMs are successfully deployed, 
+- controlplane
+- node01
+- node02
+
+You can cross-verify whether they are accessible:
+
+```bash
+$ multipass shell controlplane
+$ multipass shell node01
+$ multipass shell node02
+```
+You can do this for other nodes as well.
+
+#### Step 3
+
+Now, we should make each VMs to be accessible across each other. Please note, the script in-a-way, creates a $PRIMARY_IP in the same subnet for all three nodes so, it is easy to connect with them. But, to access the worker nodes and perform tasks, we can create a `ssh-keygen` in the controlplane and copy the `public key` to other nodes as well.
+
+On the `controlplane` node:
+
+```bash
+$ multipass shell controplane
+$ ssh-keygen
+```
+
+Leave all settings to `default` (just press ENTER at any questions) asked when running the `ssh-keygen` in the **`ControlPlane` node**.
+
+Let's Copy `Public Key` to `Worker` Nodes:
+
+```bash
+ssh-copy-id -o StrictHostKeyChecking=no ubuntu@node01 
+ssh-copy-id -o StrictHostKeyChecking=no ubuntu@node02
+# (or)
+ssh-copy-id -o StrictHostKeyChecking=no <IP_address or PRIMARY_IP of the worker nodes>
+```
+
+This command copies the `public key (id_rsa.pub)` from the `control plane` to the `worker` nodes `~/.ssh/authorized_keys` file for the `ubuntu` user.
+
+##### What is this `StrictHostKeyChecking`?
+
+```bash
+-o StrictHostKeyChecking=no:
+This option disables the SSH prompt asking if you want to trust the host (e.g., "Are you sure you want to continue connecting?"). While not secure in production (as it skips host verification), it speeds up the process in development or lab environments.
+```
+
+#### Step 4 - ContainerD, kubelet, Kubeadm, kubectl, and crictl Installation
+
+Setting up all the nodes - `Controlplane - Node01 - Node02`
+
+We should run these commands in all the nodes.
+
+Based on what I notice in the `kodekloud nodeSetup` description:
+
+>[!Important]
+>**NOTE**
+>In this and the following sections, you will notice some groups of shell commands are enclosed in `{ }`. This is so that you can copy the block from github with the github copy button and paste to your node terminals. Without this, a group of several commands with sudo will stop after the first command and you will probably miss this fact, leading to things not working further on.
+
+My recommendation, let's try this first in the `controlplane` node and then, reproduce the same once we are successful in one node.
+
+i. Update the apt package index and install packages needed to use the Kubernetes apt repository:
+```bash
+{
+    sudo apt-get update
+    sudo apt-get install -y apt-transport-https ca-certificates curl
+}
+```
+
+ii. Set up the required kernel modules and make them persistent
+
+```bash
+{
+    cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
+overlay
+br_netfilter
+EOF
+
+    sudo modprobe overlay
+    sudo modprobe br_netfilter
+}
+```
+
+iii. Set the required kernel parameters and make them persistent
+
+```bash
+{
+    cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+EOF
+
+    sudo sysctl --system
+}
+```
+
+iv. Install the container runtime i.e. `containerd`
+
+```bash
+sudo apt-get install -y containerd
+```
+
+v. Configure the container runtime to use systemd Cgroups. 
+
+  - Create default configuration
+    ```bash
+    {
+    sudo mkdir -p /etc/containerd
+    containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/' | sudo tee /etc/containerd/config.toml
+    }
+    ```
+  
+  - Restart containerd
+    
+    ```bash
+    $ sudo systemctl restart containerd
+    ```
+
+vi. Determine latest version of Kubernetes and store in a shell variable
+
+```bash
+KUBE_LATEST=$(curl -L -s https://dl.k8s.io/release/stable.txt | awk 'BEGIN { FS="." } { printf "%s.%s", $1, $2 }')
+```
+
+vii. Download the Kubernetes public signing key
+
+```bash
+{
+    sudo mkdir -p /etc/apt/keyrings
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/${KUBE_LATEST}/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+}
+```
+
+viii. Add the Kubernetes `apt` repository
+
+```bash
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/${KUBE_LATEST}/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+```
+
+ix. Update apt package index, install `kubelet`, `kubeadm` and `kubectl`, and pin their version
+
+```bash
+{
+    sudo apt-get update
+    sudo apt-get install -y kubelet kubeadm kubectl
+    sudo apt-mark hold kubelet kubeadm kubectl
+}
+```
+
+x. Configure `crictl` in case we need it to examine running containers
+
+```bash
+sudo crictl config \
+    --set runtime-endpoint=unix:///run/containerd/containerd.sock \
+    --set image-endpoint=unix:///run/containerd/containerd.sock
+```
+
+You can recheck, whether the `crictl.yaml` is available in location - `$ cat /etc/crictl.yaml`.
+
+xi. Prepare extra arguments for `kubelet` such that when it starts, it listens on the `VM's primary network address` and not any `NAT` one that may be present. This uses the predefined `PRIMARY_IP` environment variable discusseed earlier.
+
+```bash
+cat <<EOF | sudo tee /etc/default/kubelet
+KUBELET_EXTRA_ARGS='--node-ip ${PRIMARY_IP}'
+EOF
+```
+
+You would need make sure you install all these line items in all the nodes - `controlplane, node01, node02`. Please verify it once you installed it completely.
+
+#### Step 5: Boot the Controlplane
+
+Still now, the VM is UP but, the `Controlplane` is a k8s cluster is NOT started, let's boot the `controlplane`:
+
+i. Set shell variables for the `pod` and `network` CIDRs. The API server advertise address is using the predefined variable described in the previous section:
+
+```bash
+POD_CIDR=10.244.0.0/16
+SERVICE_CIDR=10.96.0.0/16
+```
+
+ii. Start controlplane
+
+>[!Important]
+> Verify before starting the `controlplane` that all your nodes have been installed with the `kubelet, kubeadm, kubectl, containerd, and crictl`.
+
+Here we are using arguments to `kubeadm` to ensure that it uses the `networks` and `IP address` we want rather than choosing defaults which may be incorrect.
+
+```bash
+$ sudo kubeadm init --pod-network-cidr $POD_CIDR --service-cidr $SERVICE_CIDR --apiserver-advertise-address $PRIMARY_IP
+```
+
+The output of the above `kubeadm init` looks like this:
+
+```bash
+# example:
+$ sudo kubeadm init --pod-network-cidr $POD_CIDR --service-cidr $SERVICE_CIDR --apiserver-advertise-address $PRIMARY_IP
+...
+...
+...
+Your Kubernetes control-plane has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+chmod 600 $HOME/.kube/config
+
+Alternatively, if you are the root user, you can run:
+
+  export KUBECONFIG=/etc/kubernetes/admin.conf
+
+You should now deploy a pod network to the cluster.
+Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+Then you can join any number of worker nodes by running the following on each as root:
+
+kubeadm join 192.168.29.143:6443 --token 9tss4i.hfladw80i4bmuykq --discovery-token-ca-cert-hash sha256:af108934bc82ff0783afe0fb34d8af8242dcc471d7c09029c36b41649e8a0789 
+```
+
+We can now, perform the commands mentioned above:
+
+```bash
+{
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+chmod 600 $HOME/.kube/config
+}
+```
+Now, we have given the permissions. 
+
+The moment of truth is here:
+
+```bash
+$ kubectl get pods -n kube-system
+```
+
+If successfully, you should see the pods coming up or `running` and the coreDNS is still on `pending`. This gets to `running` once we run the `CNI` i.e. `weave network`.
+
+Install `Weave networking`:
+
+> **DO NOT USE THIS:**
+As an impact, the old weave net installation link won’t work anymore:
+>```bash
+>$ kubectl apply -f “https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d ‘\n’)”
+>```
+
+**(Latest Usage of Weave Net Repo)**
+```bash
+$ kubectl apply -f "https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s-1.11.yaml"
+```
+
+Once this done, check again:
+
+```bash
+$ kubectl get pods -n kube-system
+```
+
+Now, you should be able to notice all the pods `up` and `running` in the `controlplane` node.
+
+#### Step 6: Join the Worker nodes
+
+If you have copied the `kubeadm join` command from the previous installation, it's good. 
+
+```bash
+kubeadm join 192.168.29.143:6443 --token 9tss4i.hfladw80i4bmuykq --discovery-token-ca-cert-hash sha256:af108934bc82ff0783afe0fb34d8af8242dcc471d7c09029c36b41649e8a0789
+```
+
+Otherwise, we can perform.
+
+```bash
+$ kubeadm token create --print-join-command
+```
+
+We can now, `ssh` to both the worker nodes. Still not part of the `k8s cluster`. 
+
+```bash
+# In node01
+$ multipass shell node01
+$ sudo -i
+$ kubeadm join 192.168.29.143:6443 --token 9tss4i.hfladw80i4bmuykq --discovery-token-ca-cert-hash sha256:af108934bc82ff0783afe0fb34d8af8242dcc471d7c09029c36b41649e8a0789
+```
+
+```bash
+# In node02
+$ multipass shell node02
+$ sudo -i
+$ kubeadm join 192.168.29.143:6443 --token 9tss4i.hfladw80i4bmuykq --discovery-token-ca-cert-hash sha256:af108934bc82ff0783afe0fb34d8af8242dcc471d7c09029c36b41649e8a0789
+```
+
+Once, the worker nodes have joined the cluster, we can go back to the `controlplane` and run `kubectl get nodes` to check the nodes have joined the cluster as expected.
+
+#### Step 7: Test it
+
+Run this in your `Controlplane` node:
+
+```bash
+$ kubectl create deployment nginx --image nginx:alpine
+$ kubectl expose deploy nginx --type=NodePort --port 80
+$ PORT_NUMBER=$(kubectl get service -l app=nginx -o jsonpath="{.items[0].spec.ports[0].nodePort}")
+$ echo -e "\n\nService exposed on NodePort $PORT_NUMBER"
+```
+
+Now, you should get the `nodePort` that is exposed, let's keep this as `32417` port.
+
+You can run a `curl` command from the `controlplane`:
+
+```bash
+$ curl http://node01:$PORT_NUMBER
+$ curl http://node02:$PORT_NUMBER
+# (or)
+$ curl http://node01:32417
+$ curl http://node02:32417
+```
+
+If you wanted to check the same in your Chrome Browser in the Mac Host.
+
+Go to `Multipass UI/Application`, get the `public IP` for each VMs and run it appending the `port_number - 32417`.
+
+![multipass_ui_mac](multipass_ui_mac.png)
+
+**Voila, the `K8s cluster` is installed successfully!**
+
+------
