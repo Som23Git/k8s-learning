@@ -10019,7 +10019,6 @@ https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-ku
 
 ### Deploy a Kubeadm - Provision VMs with Vagrant
 
-
 For Prerequisites:
 
 How to run the Vagrant and the virtualization box using QEMU in MacOS Silicon Chip M1:
@@ -10053,3 +10052,441 @@ $ vagrant up --provider=qemu
 # log into the VM
 $ vagrant ssh
 ```
+
+Please note, the MacOS M1 did not support virtualization as expected which led to `errors` related to `providers` while using `virtualbox` and the `qemu`.
+
+----------
+
+### Installing Kubeadm in the MacOS Silicon Chip(M1)
+
+#### Step 1
+  - Multipass - https://multipass.run/install. Follow the instructions to install it and check it is working properly. You should be able to successfully create a test Ubuntu VM following their instructions. Delete the test VM when you're done.
+  - JQ - https://github.com/stedolan/jq/wiki/Installation#macos
+
+----
+Let's do this:
+
+Download from here: https://canonical.com/multipass/install
+
+or
+
+Can use from the Terminal:
+
+```bash
+$ curl -L "https://github.com/canonical/multipass/releases/download/v1.15.0/multipass-1.15.0+mac-Darwin.pkg" -o multipass-1.15.0.pkg
+$ sudo installer -pkg multipass-1.15.0.pkg -target /
+```
+
+Or you can run the `pkg` via the UI itself from the `Finder`.
+
+To cross-verify whether the `multipass` installed successfully, follow the below commands:
+
+```bash
+# To create a VM named foo using multipass
+$ multipass launch --name foo
+
+# Once VM is created, to list the VMs:
+$ multipass list
+
+# To stop the VMs
+$ multipass stop foo
+```
+
+Then, install `jq`:
+
+```bash
+$ brew install jq
+```
+If no `brew`:
+
+```bash
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+#### Step 2
+
+The complete Credits should go to `kodekloud team` because they have created a script to deploy `ControlPlane`, `node01`, `node02` VMs using the `Multipass`.
+
+I followed this `Github` pretty-much, post that:
+
+```bash
+$ mkdir ~/kodekloud
+$ cd ~/kodekloud
+$ git clone https://github.com/kodekloudhub/certified-kubernetes-administrator-course.git
+$ cd certified-kubernetes-administrator-course/kubeadm-clusters/apple-silicon
+```
+
+Check whether the `multipass` working once again and run this script:
+
+```bash
+$ ./deploy-virtual-machines.sh
+
+# To debug(Recommended)
+$ bash -x deploy-virtual-machines.sh
+```
+
+I made one change to the `deploy-virtual-machines.sh` script:
+
+```yaml
+$ cat deploy-virtual-machines.sh
+59 # Determine interface for bridge
+- 60 interface=""
++ 60 interface="en0"
+61 bridge_arg="--bridged"
+```
+where the `interface` will be picked while the script is instantiated but, I explicitly provided it to use `en0` for my clarity.
+
+When you run the `bash -x .deploy-virtual-machines.sh`, you can clearly notice the commands performed by the `script`.
+
+```bash
+$ multipass launch $bridge_arg --disk 5G --memory $VM_MEM_GB --cpus 2 --name $node jammy 2
+```
+You can see that the script configuring 5 GB disk and 2 CPUs and the Memory gets calculated using this `MEM_GB=$(( $(sysctl hw.memsize | cut -d ' ' -f 2) /  1073741824 ))`. Simply gets your RAM and then, run through this condition:
+
+```bash
+VM_MEM_GB=3G
+
+if [ $MEM_GB -lt 8 ]
+then
+    echo -e "${RED}System RAM is ${MEM_GB}GB. This is insufficient to deploy a working cluster.${NC}"
+    exit 1
+fi
+
+if [ $MEM_GB -lt 16 ]
+then
+    echo -e "${YELLOW}System RAM is ${MEM_GB}GB. Deploying only one worker node.${NC}"
+    NUM_WORKER_NODES=1
+    VM_MEM_GB=2G
+    sleep 1
+fi
+```
+**RAM Allocates:**
+- 3 GB => System RAM is gt(greater than) 16 GB
+- 2 GB => System RAM is lt(less than) 16 GB
+- 1 GB => System RAM is lt(less than) 8 GB.
+
+Once your VMs are successfully deployed, 
+- controlplane
+- node01
+- node02
+
+You can cross-verify whether they are accessible:
+
+```bash
+$ multipass shell controlplane
+$ multipass shell node01
+$ multipass shell node02
+```
+You can do this for other nodes as well.
+
+#### Step 3
+
+Now, we should make each VMs to be accessible across each other. Please note, the script in-a-way, creates a $PRIMARY_IP in the same subnet for all three nodes so, it is easy to connect with them. But, to access the worker nodes and perform tasks, we can create a `ssh-keygen` in the controlplane and copy the `public key` to other nodes as well.
+
+On the `controlplane` node:
+
+```bash
+$ multipass shell controplane
+$ ssh-keygen
+```
+
+Leave all settings to `default` (just press ENTER at any questions) asked when running the `ssh-keygen` in the **`ControlPlane` node**.
+
+Let's Copy `Public Key` to `Worker` Nodes:
+
+```bash
+ssh-copy-id -o StrictHostKeyChecking=no ubuntu@node01 
+ssh-copy-id -o StrictHostKeyChecking=no ubuntu@node02
+# (or)
+ssh-copy-id -o StrictHostKeyChecking=no <IP_address or PRIMARY_IP of the worker nodes>
+```
+
+This command copies the `public key (id_rsa.pub)` from the `control plane` to the `worker` nodes `~/.ssh/authorized_keys` file for the `ubuntu` user.
+
+##### What is this `StrictHostKeyChecking`?
+
+```bash
+-o StrictHostKeyChecking=no:
+This option disables the SSH prompt asking if you want to trust the host (e.g., "Are you sure you want to continue connecting?"). While not secure in production (as it skips host verification), it speeds up the process in development or lab environments.
+```
+
+#### Step 4 - ContainerD, kubelet, Kubeadm, kubectl, and crictl Installation
+
+Setting up all the nodes - `Controlplane - Node01 - Node02`
+
+We should run these commands in all the nodes.
+
+Based on what I notice in the `kodekloud nodeSetup` description:
+
+>[!Important]
+>**NOTE**
+>In this and the following sections, you will notice some groups of shell commands are enclosed in `{ }`. This is so that you can copy the block from github with the github copy button and paste to your node terminals. Without this, a group of several commands with sudo will stop after the first command and you will probably miss this fact, leading to things not working further on.
+
+My recommendation, let's try this first in the `controlplane` node and then, reproduce the same once we are successful in one node.
+
+i. Update the apt package index and install packages needed to use the Kubernetes apt repository:
+```bash
+{
+    sudo apt-get update
+    sudo apt-get install -y apt-transport-https ca-certificates curl
+}
+```
+
+ii. Set up the required kernel modules and make them persistent
+
+```bash
+{
+    cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
+overlay
+br_netfilter
+EOF
+
+    sudo modprobe overlay
+    sudo modprobe br_netfilter
+}
+```
+
+iii. Set the required kernel parameters and make them persistent
+
+```bash
+{
+    cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+EOF
+
+    sudo sysctl --system
+}
+```
+
+iv. Install the container runtime i.e. `containerd`
+
+```bash
+sudo apt-get install -y containerd
+```
+
+v. Configure the container runtime to use systemd Cgroups. 
+
+  - Create default configuration
+    ```bash
+    {
+    sudo mkdir -p /etc/containerd
+    containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/' | sudo tee /etc/containerd/config.toml
+    }
+    ```
+  
+  - Restart containerd
+    
+    ```bash
+    $ sudo systemctl restart containerd
+    ```
+
+vi. Determine latest version of Kubernetes and store in a shell variable
+
+```bash
+KUBE_LATEST=$(curl -L -s https://dl.k8s.io/release/stable.txt | awk 'BEGIN { FS="." } { printf "%s.%s", $1, $2 }')
+```
+
+vii. Download the Kubernetes public signing key
+
+```bash
+{
+    sudo mkdir -p /etc/apt/keyrings
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/${KUBE_LATEST}/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+}
+```
+
+viii. Add the Kubernetes `apt` repository
+
+```bash
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/${KUBE_LATEST}/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+```
+
+ix. Update apt package index, install `kubelet`, `kubeadm` and `kubectl`, and pin their version
+
+```bash
+{
+    sudo apt-get update
+    sudo apt-get install -y kubelet kubeadm kubectl
+    sudo apt-mark hold kubelet kubeadm kubectl
+}
+```
+
+x. Configure `crictl` in case we need it to examine running containers
+
+```bash
+sudo crictl config \
+    --set runtime-endpoint=unix:///run/containerd/containerd.sock \
+    --set image-endpoint=unix:///run/containerd/containerd.sock
+```
+
+You can recheck, whether the `crictl.yaml` is available in location - `$ cat /etc/crictl.yaml`.
+
+xi. Prepare extra arguments for `kubelet` such that when it starts, it listens on the `VM's primary network address` and not any `NAT` one that may be present. This uses the predefined `PRIMARY_IP` environment variable discusseed earlier.
+
+```bash
+cat <<EOF | sudo tee /etc/default/kubelet
+KUBELET_EXTRA_ARGS='--node-ip ${PRIMARY_IP}'
+EOF
+```
+
+You would need make sure you install all these line items in all the nodes - `controlplane, node01, node02`. Please verify it once you installed it completely.
+
+#### Step 5: Boot the Controlplane
+
+Still now, the VM is UP but, the `Controlplane` is a k8s cluster is NOT started, let's boot the `controlplane`:
+
+i. Set shell variables for the `pod` and `network` CIDRs. The API server advertise address is using the predefined variable described in the previous section:
+
+```bash
+POD_CIDR=10.244.0.0/16
+SERVICE_CIDR=10.96.0.0/16
+```
+
+ii. Start controlplane
+
+>[!Important]
+> Verify before starting the `controlplane` that all your nodes have been installed with the `kubelet, kubeadm, kubectl, containerd, and crictl`.
+
+Here we are using arguments to `kubeadm` to ensure that it uses the `networks` and `IP address` we want rather than choosing defaults which may be incorrect.
+
+```bash
+$ sudo kubeadm init --pod-network-cidr $POD_CIDR --service-cidr $SERVICE_CIDR --apiserver-advertise-address $PRIMARY_IP
+```
+
+The output of the above `kubeadm init` looks like this:
+
+```bash
+# example:
+$ sudo kubeadm init --pod-network-cidr $POD_CIDR --service-cidr $SERVICE_CIDR --apiserver-advertise-address $PRIMARY_IP
+...
+...
+...
+Your Kubernetes control-plane has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+chmod 600 $HOME/.kube/config
+
+Alternatively, if you are the root user, you can run:
+
+  export KUBECONFIG=/etc/kubernetes/admin.conf
+
+You should now deploy a pod network to the cluster.
+Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+Then you can join any number of worker nodes by running the following on each as root:
+
+kubeadm join 192.168.29.143:6443 --token 9tss4i.hfladw80i4bmuykq --discovery-token-ca-cert-hash sha256:af108934bc82ff0783afe0fb34d8af8242dcc471d7c09029c36b41649e8a0789 
+```
+
+We can now, perform the commands mentioned above:
+
+```bash
+{
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+chmod 600 $HOME/.kube/config
+}
+```
+Now, we have given the permissions. 
+
+The moment of truth is here:
+
+```bash
+$ kubectl get pods -n kube-system
+```
+
+If successfully, you should see the pods coming up or `running` and the coreDNS is still on `pending`. This gets to `running` once we run the `CNI` i.e. `weave network`.
+
+Install `Weave networking`:
+
+> **DO NOT USE THIS:**
+As an impact, the old weave net installation link won’t work anymore:
+>```bash
+>$ kubectl apply -f “https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d ‘\n’)”
+>```
+
+**(Latest Usage of Weave Net Repo)**
+```bash
+$ kubectl apply -f "https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s-1.11.yaml"
+```
+
+Once this done, check again:
+
+```bash
+$ kubectl get pods -n kube-system
+```
+
+Now, you should be able to notice all the pods `up` and `running` in the `controlplane` node.
+
+#### Step 6: Join the Worker nodes
+
+If you have copied the `kubeadm join` command from the previous installation, it's good. 
+
+```bash
+kubeadm join 192.168.29.143:6443 --token 9tss4i.hfladw80i4bmuykq --discovery-token-ca-cert-hash sha256:af108934bc82ff0783afe0fb34d8af8242dcc471d7c09029c36b41649e8a0789
+```
+
+Otherwise, we can perform.
+
+```bash
+$ kubeadm token create --print-join-command
+```
+
+We can now, `ssh` to both the worker nodes. Still not part of the `k8s cluster`. 
+
+```bash
+# In node01
+$ multipass shell node01
+$ sudo -i
+$ kubeadm join 192.168.29.143:6443 --token 9tss4i.hfladw80i4bmuykq --discovery-token-ca-cert-hash sha256:af108934bc82ff0783afe0fb34d8af8242dcc471d7c09029c36b41649e8a0789
+```
+
+```bash
+# In node02
+$ multipass shell node02
+$ sudo -i
+$ kubeadm join 192.168.29.143:6443 --token 9tss4i.hfladw80i4bmuykq --discovery-token-ca-cert-hash sha256:af108934bc82ff0783afe0fb34d8af8242dcc471d7c09029c36b41649e8a0789
+```
+
+Once, the worker nodes have joined the cluster, we can go back to the `controlplane` and run `kubectl get nodes` to check the nodes have joined the cluster as expected.
+
+#### Step 7: Test it
+
+Run this in your `Controlplane` node:
+
+```bash
+$ kubectl create deployment nginx --image nginx:alpine
+$ kubectl expose deploy nginx --type=NodePort --port 80
+$ PORT_NUMBER=$(kubectl get service -l app=nginx -o jsonpath="{.items[0].spec.ports[0].nodePort}")
+$ echo -e "\n\nService exposed on NodePort $PORT_NUMBER"
+```
+
+Now, you should get the `nodePort` that is exposed, let's keep this as `32417` port.
+
+You can run a `curl` command from the `controlplane`:
+
+```bash
+$ curl http://node01:$PORT_NUMBER
+$ curl http://node02:$PORT_NUMBER
+# (or)
+$ curl http://node01:32417
+$ curl http://node02:32417
+```
+
+If you wanted to check the same in your Chrome Browser in the Mac Host.
+
+Go to `Multipass UI/Application`, get the `public IP` for each VMs and run it appending the `port_number - 32417`.
+
+![multipass_ui_mac](multipass_ui_mac.png)
+
+**Voila, the `K8s cluster` is installed successfully!**
+
+------
