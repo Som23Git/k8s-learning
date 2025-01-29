@@ -10216,6 +10216,8 @@ Setting up all the nodes - `Controlplane - Node01 - Node02`
 
 We should run these commands in all the nodes.
 
+Please note, you can refer to this [Official Kubernetes Documentation on Kudeadm Installation](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/)
+
 Based on what I notice in the `kodekloud nodeSetup` description:
 
 >[!Important]
@@ -10340,6 +10342,7 @@ Still now, the VM is UP but, the `Controlplane` is a k8s cluster is NOT started,
 i. Set shell variables for the `pod` and `network` CIDRs. The API server advertise address is using the predefined variable described in the previous section:
 
 ```bash
+# Pod Network
 POD_CIDR=10.244.0.0/16
 SERVICE_CIDR=10.96.0.0/16
 ```
@@ -10488,5 +10491,46 @@ Go to `Multipass UI/Application`, get the `public IP` for each VMs and run it ap
 ![multipass_ui_mac](multipass_ui_mac.png)
 
 **Voila, the `K8s cluster` is installed successfully!**
+
+------
+
+##### In short: Important Commands to Spin Up a `K8s Cluster`
+
+** Apply these commands in all the nodes: **
+
+```bash
+$ sudo apt-get update
+$ sudo apt-get install -y apt-transport-https ca-certificates curl gpg
+$ sudo apt-get install -y cpuinfo
+$ curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+$ echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+$ sudo apt-get update
+$ apt-cache madison kubelet kubeadm kubectl
+$ VERSION=1.31.0-1.1
+$ sudo apt-get install -y kubelet=$VERSION kubeadm=$VERSION kubectl=$VERSION
+$ sudo apt-get install -y kubelet kubeadm kubectl
+$ sudo apt-mark hold kubelet kubeadm kubectl
+```
+
+** Apply these commands in the `Controlplane` node: **
+
+```bash
+$ ip route show
+$ ip addr
+
+# Please note, the --apiserver-adverstise-address is the IP address of the `node` itself i.e. `eth0`
+$ kubeadm init --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=192.2.115.8
+
+$ kubectl get nodes
+$ kubectl get pods -A
+```
+
+** Apply these commands in the `worker` node **
+
+```bash
+$ kubeadm join 192.2.115.8:6443 --token c87mgy.kfb8p0gn2z7donnu --discovery-token-ca-cert-hash sha256:dcc0e541414a5c59a647556a4f695cf5cb10243e8c3629570305331c1855a83f 
+```
+
+The nodes will be joining the `controlplane` forming a `quorum`
 
 ------
