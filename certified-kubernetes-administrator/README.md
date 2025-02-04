@@ -10547,6 +10547,8 @@ In short, Helm is similar to package manager with install and uninstall wizard. 
 $ helm install wordpress
 ```
 
+-----
+
 ### How to install Helm? Installation and Configuration of Helm?
 
 Prerequisites:
@@ -10569,7 +10571,259 @@ $ sudo apt-get update sudo apt-get install helm
 $ pkg install helm
 ```
 
-Refer to the helm documentation for more detailed information: https://helm.sh/docs/intro/install/.
+1. Refer to the helm documentation for more detailed information: https://helm.sh/docs/intro/install/.
+2. Quick start guide: https://helm.sh/docs/intro/quickstart/
+
+-----
+
+### A quick note about Helm2 vs Helm3
+
+**Helm History:
+Helm1 -> released around Feb 2016
+Helm2 -> released around Nov 2016
+Helm3 -> released around Nov 2019**
+
+**Using `Tiller` in Helm2**
+
+In Helm2, due to lack of `RBAC`(Role Based Access Control) and `CRD`(Custom Resource Definition) functions in Kubernetes cluster, it was using an `intermediate` server to handle the request from the `helm` to `k8s` cluster called `Tiller`.
+
+Here is a architecture documentation of helm2 using `Tiller`: https://v2.helm.sh/docs/architecture/#:~:text=The%20Tiller%20Server%20is%20an,configuration%20to%20build%20a%20release.
+
+```bash
+Helm cli > Tiller > K8s cluster
+```
+
+By default, the `Tiller` was running on `God Mode` i.e. it got access more than as it required.
+
+Once, the `RBAC` and `CRD` were developed in the `Kubernetes`, the usage of `Tiller` was removed which is why, you see `helm3`.
+
+**Another difference between `helm2` and `helm3` is `3-way strategic Merge Patch`.**
+
+**In Helm2**
+![no-3-way-strategic-Merge-Patch_helm2](no-3-way-strategic-Merge-Patch_helm2.png)
+
+There is no `3-way strategic Merge Patch` so, it is NOT intelligent to understand whether there were any changes on the deployment via `Kubectl` or `helm`.
+
+**In Helm3**
+![3-way-strategic-Merge-Patch_helm3](3-way-strategic-Merge-Patch_helm3.png)
+
+In Helm3, it is very intelligent to know whether there are any changes made in the deployment even via `kubectl` or `helm` tools, it records all the changes and roll back is supported when it is needed.
+
+-------
+
+### Helm Components
+
+#### Helm charts
+
+charts -> It is a collection of files, that contains all the instructions that the `helm` needs to know. Whenever the chart is applied to the cluster, a `Release` is created. Within each `Release`, a new `Revision(s)` are created.
+
+There are public charts hub, similar to `docker hub` so, we can pull it locally and run it.
+
+To track of what is happened/happening in the cluster, the helm needs a file called `Metadata`. The `helm` saves this `Metadata` file in the `k8s cluster`.
+
+In a `helm` charts, we need to pass the `values.yaml`.
+
+![helm_components_values_yaml](helm_components_values_yaml.png)
+
+#### helm releases
+
+```bash
+# If you see the commands, with the same chart the helm creates two `releases`.
+
+$ helm install <release-name> <chart-name>
+
+$ helm install my-site bitnami/wordpress
+$ helm install my-second-site bitnami/wordpress
+```
+
+#### Helm Repositories:
+
+ARTIFACTHUB - You can download the charts from here: https://artifacthub.io/.
+
+Appscode
+Community operators
+Truecharts
+Bitnami
+
+------
+
+### Helm Charts
+
+![files_used_to_build_a_cluster_via_helm](files_used_to_build_a_cluster_via_helm.png)
+
+- service.yaml
+- deployment.yaml
+- values.yaml
+- Chart.yaml
+
+`apiVersion: v2` in `Chart.yaml` --> Helm3 which is `v2`, and for `helm2`, it is NOT required or it is ignored in the `Chart.yaml`.
+
+![helm_chart_structure](helm_chart_structure.png)
+
+------
+
+### Working with Helm: Basics
+
+```bash
+$ helm search wordpress
+$ helm search hub wordpress
+
+# example:
+
+$ helm repo add bitnami https://charts.bitnami.com/bitnami
+
+$ helm install my-release bitnami/wordpress
+
+$ helm list
+
+$ helm uninstall my-release
+
+$ helm repo
+
+$ helm repo list
+
+$ helm repo update
+```
+
+-----
+
+### Customizing Chart Parameters
+
+Custom Parameters:
+
+```bash
+$ helm install my-release bitnami/wordpress
+
+$ helm install --set wordpressBlogName="Helm Tutorials"  --set wordpressEmail="john@example.com" my-release bitnami/wordpress
+```
+
+#### Custom Parameters using the values YAML file
+We can also add a new file called `custom-values.yaml`
+
+```yaml
+# custom-values.yaml
+
+wordpressBlogName: Helm Tutorials
+wordpressEmail: john@example.com
+```
+
+```bash
+$ helm install --values custom-values.yaml my-release bitnami/wordpress
+```
+
+#### Manually pulling the chart and installing the release
+
+```bash
+$ helm pull bitnami/wordpress
+
+$ helm pull --untar bitnami/wordpress
+
+$ helm install my-release ./wordpress
+```
+
+-------
+
+##### Commands Used
 
 
+```bash
+
+$ helm search hub consul
+$ helm search hub consul | grep -i "Official HashiCorp Consul Chart"
+
+$ helm repo add bitnami https://charts.bitnami.com/bitnami
+
+"bitnami" has been added to your repositories
+
+$ helm repo list
+
+NAME    URL                               
+bitnami https://charts.bitnami.com/bitnami
+
+$ helm search repo wordpress
+
+NAME                    CHART VERSION   APP VERSION     DESCRIPTION                                       
+bitnami/wordpress       24.1.9          6.7.1           WordPress is the world's most popular blogging ...
+bitnami/wordpress-intel 2.1.31          6.1.1           DEPRECATED WordPress for Intel is the most popu...
+
+$ helm repo list
+
+NAME            URL                                                 
+bitnami         https://charts.bitnami.com/bitnami                  
+puppet          https://puppetlabs.github.io/puppetserver-helm-chart
+hashicorp       https://helm.releases.hashicorp.com      
+
+$ helm install amaze-surf bitnami/apache
+
+# output:
+
+NAME: amaze-surf
+LAST DEPLOYED: Tue Feb  4 18:49:21 2025
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+CHART NAME: apache
+CHART VERSION: 11.3.2
+APP VERSION: 2.4.63
+
+Did you know there are enterprise versions of the Bitnami catalog? For enhanced secure software supply chain features, unlimited pulls from Docker, LTS support, or application customization, see Bitnami Premium or Tanzu Application Catalog. See https://www.arrow.com/globalecs/na/vendors/bitnami for more information.
+
+** Please be patient while the chart is being deployed **
+
+1. Get the Apache URL by running:
+
+** Please ensure an external IP is associated to the amaze-surf-apache service before proceeding **
+** Watch the status using: kubectl get svc --namespace default -w amaze-surf-apache **
+
+  export SERVICE_IP=$(kubectl get svc --namespace default amaze-surf-apache --template "{{ range (index .status.loadBalancer.ingress 0) }}{{ . }}{{ end }}")
+  echo URL            : http://$SERVICE_IP/
+
+
+WARNING: You did not provide a custom web application. Apache will be deployed with a default page. Check the README section "Deploying your custom web application" in https://github.com/bitnami/charts/blob/main/bitnami/apache/README.md#deploying-a-custom-web-application.
+
+
+
+WARNING: There are "resources" sections in the chart not set. Using "resourcesPreset" is not recommended for production. For production installations, please set the following values according to your workload needs:
+  - resources
++info https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+
+
+$ kubectl get all
+NAME                                     READY   STATUS    RESTARTS   AGE
+pod/amaze-surf-apache-5b887874f7-9btds   1/1     Running   0          3m39s
+
+NAME                        TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)                      AGE
+service/amaze-surf-apache   LoadBalancer   172.20.171.65   <pending>     80:30655/TCP,443:31653/TCP   3m39s
+service/kubernetes          ClusterIP      172.20.0.1      <none>        443/TCP                      22m
+
+NAME                                READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/amaze-surf-apache   1/1     1            1           3m39s
+
+NAME                                           DESIRED   CURRENT   READY   AGE
+replicaset.apps/amaze-surf-apache-5b887874f7   1         1         1       3m39s
+
+$ helm history amaze-surf
+
+REVISION        UPDATED                         STATUS          CHART           APP VERSION     DESCRIPTION     
+1               Tue Feb  4 18:49:21 2025        deployed        apache-11.3.2   2.4.63          Install complete
+
+$ helm list
+NAME            NAMESPACE       REVISION        UPDATED                                 STATUS          CHART                APP VERSION
+amaze-surf      default         1               2025-02-04 18:49:21.89286965 +0000 UTC  deployed        apache-11.3.2        2.4.63     
+crazy-web       default         1               2025-02-04 18:53:36.813451696 +0000 UTC deployed        nginx-18.3.5         1.27.3     
+happy-browse    default         1               2025-02-04 18:53:29.758251119 +0000 UTC deployed        nginx-18.3.5         1.27.3     
+
+$ helm uninstall happy-browse
+release "happy-browse" uninstalled
+
+$ helm repo remove hashicorp
+"hashicorp" has been removed from your repositories
+
+$ helm repo list
+NAME    URL                                                 
+bitnami https://charts.bitnami.com/bitnami                  
+puppet  https://puppetlabs.github.io/puppetserver-helm-chart
+```
 
