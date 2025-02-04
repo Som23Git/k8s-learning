@@ -10533,4 +10533,43 @@ $ kubeadm join 192.2.115.8:6443 --token c87mgy.kfb8p0gn2z7donnu --discovery-toke
 
 The nodes will be joining the `controlplane` forming a `quorum`
 
-------
+----------
+
+## :: Helm Basics
+
+----------
+
+### What is Helm?
+
+In short, Helm is similar to package manager with install and uninstall wizard. Also, with upgrade and rollback.
+
+```bash
+$ helm install wordpress
+```
+
+### How to install Helm? Installation and Configuration of Helm?
+
+Prerequisites:
+
+- kubectl 
+- k8s cluster
+
+#### How to install Helm on Linux?
+
+```bash
+$ sudo snap install helm --classic
+
+For debian/ubuntu:
+
+$ curl https://baltocdn.com/helm/signing.asc | sudo apt-key add -
+$ sudo apt-get install apt-transport-https --yes
+$ echo "deb https://baltocdn.com/helm/stable/debian/ all main" | sudo tee / etc/apt/sources.list.d/helm-stable-debian.list
+$ sudo apt-get update sudo apt-get install helm
+
+$ pkg install helm
+```
+
+Refer to the helm documentation for more detailed information: https://helm.sh/docs/intro/install/.
+
+
+
