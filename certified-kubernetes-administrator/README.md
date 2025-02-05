@@ -10826,4 +10826,102 @@ NAME    URL
 bitnami https://charts.bitnami.com/bitnami                  
 puppet  https://puppetlabs.github.io/puppetserver-helm-chart
 ```
+-----
+
+### Helm Lifecycle Management
+
+```bash
+$ helm rollback nginx-release 1
+```
+
+##### Commands Used:
+
+```bash
+$ helm upgrade dazzling-web nginx --repo=https://charts.bitnami.com/bitnami --version=13.2.13 --dry-run=client
+```
+
+Removing the `dry-run`:
+
+```bash
+$ helm upgrade dazzling-web nginx --repo=https://charts.bitnami.com/bitnami --version=13.2.13
+Release "dazzling-web" has been upgraded. Happy Helming!
+NAME: dazzling-web
+LAST DEPLOYED: Wed Feb  5 04:22:31 2025
+NAMESPACE: default
+STATUS: deployed
+REVISION: 4
+TEST SUITE: None
+NOTES:
+CHART NAME: nginx
+CHART VERSION: 13.2.13
+APP VERSION: 1.23.2
+
+** Please be patient while the chart is being deployed **
+NGINX can be accessed through the following DNS name from within your cluster:
+
+    dazzling-web-nginx.default.svc.cluster.local (port 80)
+
+To access NGINX from outside the cluster, follow the steps below:
+
+1. Get the NGINX URL by running these commands:
+
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+        Watch the status with: 'kubectl get svc --namespace default -w dazzling-web-nginx'
+
+    export SERVICE_PORT=$(kubectl get --namespace default -o jsonpath="{.spec.ports[0].port}" services dazzling-web-nginx)
+    export SERVICE_IP=$(kubectl get svc --namespace default dazzling-web-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+    echo "http://${SERVICE_IP}:${SERVICE_PORT}"
+```
+```bash
+$ kubectl get pods -o wide
+NAME                                 READY   STATUS    RESTARTS   AGE    IP           NODE           NOMINATED NODE   READINESS GATES
+dazzling-web-nginx-cf5dd789b-dfcgm   1/1     Running   0          101s   172.17.0.7   controlplane   <none>           <none>
+
+$ helm list
+NAME            NAMESPACE       REVISION        UPDATED                                 STATUS          CHART           APP VERSION
+dazzling-web    default         4               2025-02-05 04:22:31.035647605 +0000 UTC deployed        nginx-13.2.13   1.23.2     
+
+$ helm history dazzling-web
+REVISION        UPDATED                         STATUS          CHART           APP VERSION     DESCRIPTION     
+1               Wed Feb  5 03:55:07 2025        superseded      nginx-12.0.4    1.22.0          Install complete
+2               Wed Feb  5 03:55:12 2025        superseded      nginx-12.0.5    1.22.0          Upgrade complete
+3               Wed Feb  5 03:55:17 2025        superseded      nginx-12.0.4    1.22.0          Upgrade complete
+4               Wed Feb  5 04:22:31 2025        deployed        nginx-13.2.13   1.23.2          Upgrade complete
+
+# Now, let's rollback
+
+$ helm rollback dazzling-web 3
+Rollback was a success! Happy Helming!
+
+$ helm history dazzling-web
+REVISION        UPDATED                         STATUS          CHART           APP VERSION     DESCRIPTION     
+1               Wed Feb  5 03:55:07 2025        superseded      nginx-12.0.4    1.22.0          Install complete
+2               Wed Feb  5 03:55:12 2025        superseded      nginx-12.0.5    1.22.0          Upgrade complete
+3               Wed Feb  5 03:55:17 2025        superseded      nginx-12.0.4    1.22.0          Upgrade complete
+4               Wed Feb  5 04:22:31 2025        superseded      nginx-13.2.13   1.23.2          Upgrade complete
+5               Wed Feb  5 04:26:06 2025        deployed        nginx-12.0.4    1.22.0          Rollback to 3   
+```
+----------
+
+## :: Kustomize
+
+----------
+
+### Kustomize Problem Statement & Ideology
+
+![kustomize_dev_stg_prod_base_overlays](kustomize_dev_stg_prod_base_overlays.png)
+
+#### Kustomize Folder Structure:
+
+![kustomize_folder_structure](kustomize_folder_structure.png)
+
+#### Why Kustomize?
+
+The key reasons to use `Kustomize` is that, it is easy to use and there is not much learning curve like the `helm` chart templating language.
+
+![kustomize_key_reasons_to_use](kustomize_key_reasons_to_use.png)
+
+------
+
+### Kustomize vs Helm
 
