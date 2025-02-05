@@ -10533,4 +10533,595 @@ $ kubeadm join 192.2.115.8:6443 --token c87mgy.kfb8p0gn2z7donnu --discovery-toke
 
 The nodes will be joining the `controlplane` forming a `quorum`
 
+----------
+
+## :: Helm Basics
+
+----------
+
+### What is Helm?
+
+In short, Helm is similar to package manager with install and uninstall wizard. Also, with upgrade and rollback.
+
+```bash
+$ helm install wordpress
+```
+
+-----
+
+### How to install Helm? Installation and Configuration of Helm?
+
+Prerequisites:
+
+- kubectl 
+- k8s cluster
+
+#### How to install Helm on Linux?
+
+```bash
+$ sudo snap install helm --classic
+
+For debian/ubuntu:
+
+$ curl https://baltocdn.com/helm/signing.asc | sudo apt-key add -
+$ sudo apt-get install apt-transport-https --yes
+$ echo "deb https://baltocdn.com/helm/stable/debian/ all main" | sudo tee / etc/apt/sources.list.d/helm-stable-debian.list
+$ sudo apt-get update sudo apt-get install helm
+
+$ pkg install helm
+```
+
+1. Refer to the helm documentation for more detailed information: https://helm.sh/docs/intro/install/.
+2. Quick start guide: https://helm.sh/docs/intro/quickstart/
+
+-----
+
+### A quick note about Helm2 vs Helm3
+
+**Helm History:
+Helm1 -> released around Feb 2016
+Helm2 -> released around Nov 2016
+Helm3 -> released around Nov 2019**
+
+**Using `Tiller` in Helm2**
+
+In Helm2, due to lack of `RBAC`(Role Based Access Control) and `CRD`(Custom Resource Definition) functions in Kubernetes cluster, it was using an `intermediate` server to handle the request from the `helm` to `k8s` cluster called `Tiller`.
+
+Here is a architecture documentation of helm2 using `Tiller`: https://v2.helm.sh/docs/architecture/#:~:text=The%20Tiller%20Server%20is%20an,configuration%20to%20build%20a%20release.
+
+```bash
+Helm cli > Tiller > K8s cluster
+```
+
+By default, the `Tiller` was running on `God Mode` i.e. it got access more than as it required.
+
+Once, the `RBAC` and `CRD` were developed in the `Kubernetes`, the usage of `Tiller` was removed which is why, you see `helm3`.
+
+**Another difference between `helm2` and `helm3` is `3-way strategic Merge Patch`.**
+
+**In Helm2**
+![no-3-way-strategic-Merge-Patch_helm2](no-3-way-strategic-Merge-Patch_helm2.png)
+
+There is no `3-way strategic Merge Patch` so, it is NOT intelligent to understand whether there were any changes on the deployment via `Kubectl` or `helm`.
+
+**In Helm3**
+![3-way-strategic-Merge-Patch_helm3](3-way-strategic-Merge-Patch_helm3.png)
+
+In Helm3, it is very intelligent to know whether there are any changes made in the deployment even via `kubectl` or `helm` tools, it records all the changes and roll back is supported when it is needed.
+
+-------
+
+### Helm Components
+
+#### Helm charts
+
+charts -> It is a collection of files, that contains all the instructions that the `helm` needs to know. Whenever the chart is applied to the cluster, a `Release` is created. Within each `Release`, a new `Revision(s)` are created.
+
+There are public charts hub, similar to `docker hub` so, we can pull it locally and run it.
+
+To track of what is happened/happening in the cluster, the helm needs a file called `Metadata`. The `helm` saves this `Metadata` file in the `k8s cluster`.
+
+In a `helm` charts, we need to pass the `values.yaml`.
+
+![helm_components_values_yaml](helm_components_values_yaml.png)
+
+#### helm releases
+
+```bash
+# If you see the commands, with the same chart the helm creates two `releases`.
+
+$ helm install <release-name> <chart-name>
+
+$ helm install my-site bitnami/wordpress
+$ helm install my-second-site bitnami/wordpress
+```
+
+#### Helm Repositories:
+
+ARTIFACTHUB - You can download the charts from here: https://artifacthub.io/.
+
+Appscode
+Community operators
+Truecharts
+Bitnami
+
 ------
+
+### Helm Charts
+
+![files_used_to_build_a_cluster_via_helm](files_used_to_build_a_cluster_via_helm.png)
+
+- service.yaml
+- deployment.yaml
+- values.yaml
+- Chart.yaml
+
+`apiVersion: v2` in `Chart.yaml` --> Helm3 which is `v2`, and for `helm2`, it is NOT required or it is ignored in the `Chart.yaml`.
+
+![helm_chart_structure](helm_chart_structure.png)
+
+------
+
+### Working with Helm: Basics
+
+```bash
+$ helm search wordpress
+$ helm search hub wordpress
+
+# example:
+
+$ helm repo add bitnami https://charts.bitnami.com/bitnami
+
+$ helm install my-release bitnami/wordpress
+
+$ helm list
+
+$ helm uninstall my-release
+
+$ helm repo
+
+$ helm repo list
+
+$ helm repo update
+```
+
+-----
+
+### Customizing Chart Parameters
+
+Custom Parameters:
+
+```bash
+$ helm install my-release bitnami/wordpress
+
+$ helm install --set wordpressBlogName="Helm Tutorials"  --set wordpressEmail="john@example.com" my-release bitnami/wordpress
+```
+
+#### Custom Parameters using the values YAML file
+We can also add a new file called `custom-values.yaml`
+
+```yaml
+# custom-values.yaml
+
+wordpressBlogName: Helm Tutorials
+wordpressEmail: john@example.com
+```
+
+```bash
+$ helm install --values custom-values.yaml my-release bitnami/wordpress
+```
+
+#### Manually pulling the chart and installing the release
+
+```bash
+$ helm pull bitnami/wordpress
+
+$ helm pull --untar bitnami/wordpress
+
+$ helm install my-release ./wordpress
+```
+
+-------
+
+##### Commands Used
+
+
+```bash
+
+$ helm search hub consul
+$ helm search hub consul | grep -i "Official HashiCorp Consul Chart"
+
+$ helm repo add bitnami https://charts.bitnami.com/bitnami
+
+"bitnami" has been added to your repositories
+
+$ helm repo list
+
+NAME    URL                               
+bitnami https://charts.bitnami.com/bitnami
+
+$ helm search repo wordpress
+
+NAME                    CHART VERSION   APP VERSION     DESCRIPTION                                       
+bitnami/wordpress       24.1.9          6.7.1           WordPress is the world's most popular blogging ...
+bitnami/wordpress-intel 2.1.31          6.1.1           DEPRECATED WordPress for Intel is the most popu...
+
+$ helm repo list
+
+NAME            URL                                                 
+bitnami         https://charts.bitnami.com/bitnami                  
+puppet          https://puppetlabs.github.io/puppetserver-helm-chart
+hashicorp       https://helm.releases.hashicorp.com      
+
+$ helm install amaze-surf bitnami/apache
+
+# output:
+
+NAME: amaze-surf
+LAST DEPLOYED: Tue Feb  4 18:49:21 2025
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+CHART NAME: apache
+CHART VERSION: 11.3.2
+APP VERSION: 2.4.63
+
+Did you know there are enterprise versions of the Bitnami catalog? For enhanced secure software supply chain features, unlimited pulls from Docker, LTS support, or application customization, see Bitnami Premium or Tanzu Application Catalog. See https://www.arrow.com/globalecs/na/vendors/bitnami for more information.
+
+** Please be patient while the chart is being deployed **
+
+1. Get the Apache URL by running:
+
+** Please ensure an external IP is associated to the amaze-surf-apache service before proceeding **
+** Watch the status using: kubectl get svc --namespace default -w amaze-surf-apache **
+
+  export SERVICE_IP=$(kubectl get svc --namespace default amaze-surf-apache --template "{{ range (index .status.loadBalancer.ingress 0) }}{{ . }}{{ end }}")
+  echo URL            : http://$SERVICE_IP/
+
+
+WARNING: You did not provide a custom web application. Apache will be deployed with a default page. Check the README section "Deploying your custom web application" in https://github.com/bitnami/charts/blob/main/bitnami/apache/README.md#deploying-a-custom-web-application.
+
+
+
+WARNING: There are "resources" sections in the chart not set. Using "resourcesPreset" is not recommended for production. For production installations, please set the following values according to your workload needs:
+  - resources
++info https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+
+
+$ kubectl get all
+NAME                                     READY   STATUS    RESTARTS   AGE
+pod/amaze-surf-apache-5b887874f7-9btds   1/1     Running   0          3m39s
+
+NAME                        TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)                      AGE
+service/amaze-surf-apache   LoadBalancer   172.20.171.65   <pending>     80:30655/TCP,443:31653/TCP   3m39s
+service/kubernetes          ClusterIP      172.20.0.1      <none>        443/TCP                      22m
+
+NAME                                READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/amaze-surf-apache   1/1     1            1           3m39s
+
+NAME                                           DESIRED   CURRENT   READY   AGE
+replicaset.apps/amaze-surf-apache-5b887874f7   1         1         1       3m39s
+
+$ helm history amaze-surf
+
+REVISION        UPDATED                         STATUS          CHART           APP VERSION     DESCRIPTION     
+1               Tue Feb  4 18:49:21 2025        deployed        apache-11.3.2   2.4.63          Install complete
+
+$ helm list
+NAME            NAMESPACE       REVISION        UPDATED                                 STATUS          CHART                APP VERSION
+amaze-surf      default         1               2025-02-04 18:49:21.89286965 +0000 UTC  deployed        apache-11.3.2        2.4.63     
+crazy-web       default         1               2025-02-04 18:53:36.813451696 +0000 UTC deployed        nginx-18.3.5         1.27.3     
+happy-browse    default         1               2025-02-04 18:53:29.758251119 +0000 UTC deployed        nginx-18.3.5         1.27.3     
+
+$ helm uninstall happy-browse
+release "happy-browse" uninstalled
+
+$ helm repo remove hashicorp
+"hashicorp" has been removed from your repositories
+
+$ helm repo list
+NAME    URL                                                 
+bitnami https://charts.bitnami.com/bitnami                  
+puppet  https://puppetlabs.github.io/puppetserver-helm-chart
+```
+-----
+
+### Helm Lifecycle Management
+
+```bash
+$ helm rollback nginx-release 1
+```
+
+##### Commands Used:
+
+```bash
+$ helm upgrade dazzling-web nginx --repo=https://charts.bitnami.com/bitnami --version=13.2.13 --dry-run=client
+```
+
+Removing the `dry-run`:
+
+```bash
+$ helm upgrade dazzling-web nginx --repo=https://charts.bitnami.com/bitnami --version=13.2.13
+Release "dazzling-web" has been upgraded. Happy Helming!
+NAME: dazzling-web
+LAST DEPLOYED: Wed Feb  5 04:22:31 2025
+NAMESPACE: default
+STATUS: deployed
+REVISION: 4
+TEST SUITE: None
+NOTES:
+CHART NAME: nginx
+CHART VERSION: 13.2.13
+APP VERSION: 1.23.2
+
+** Please be patient while the chart is being deployed **
+NGINX can be accessed through the following DNS name from within your cluster:
+
+    dazzling-web-nginx.default.svc.cluster.local (port 80)
+
+To access NGINX from outside the cluster, follow the steps below:
+
+1. Get the NGINX URL by running these commands:
+
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+        Watch the status with: 'kubectl get svc --namespace default -w dazzling-web-nginx'
+
+    export SERVICE_PORT=$(kubectl get --namespace default -o jsonpath="{.spec.ports[0].port}" services dazzling-web-nginx)
+    export SERVICE_IP=$(kubectl get svc --namespace default dazzling-web-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+    echo "http://${SERVICE_IP}:${SERVICE_PORT}"
+```
+```bash
+$ kubectl get pods -o wide
+NAME                                 READY   STATUS    RESTARTS   AGE    IP           NODE           NOMINATED NODE   READINESS GATES
+dazzling-web-nginx-cf5dd789b-dfcgm   1/1     Running   0          101s   172.17.0.7   controlplane   <none>           <none>
+
+$ helm list
+NAME            NAMESPACE       REVISION        UPDATED                                 STATUS          CHART           APP VERSION
+dazzling-web    default         4               2025-02-05 04:22:31.035647605 +0000 UTC deployed        nginx-13.2.13   1.23.2     
+
+$ helm history dazzling-web
+REVISION        UPDATED                         STATUS          CHART           APP VERSION     DESCRIPTION     
+1               Wed Feb  5 03:55:07 2025        superseded      nginx-12.0.4    1.22.0          Install complete
+2               Wed Feb  5 03:55:12 2025        superseded      nginx-12.0.5    1.22.0          Upgrade complete
+3               Wed Feb  5 03:55:17 2025        superseded      nginx-12.0.4    1.22.0          Upgrade complete
+4               Wed Feb  5 04:22:31 2025        deployed        nginx-13.2.13   1.23.2          Upgrade complete
+
+# Now, let's rollback
+
+$ helm rollback dazzling-web 3
+Rollback was a success! Happy Helming!
+
+$ helm history dazzling-web
+REVISION        UPDATED                         STATUS          CHART           APP VERSION     DESCRIPTION     
+1               Wed Feb  5 03:55:07 2025        superseded      nginx-12.0.4    1.22.0          Install complete
+2               Wed Feb  5 03:55:12 2025        superseded      nginx-12.0.5    1.22.0          Upgrade complete
+3               Wed Feb  5 03:55:17 2025        superseded      nginx-12.0.4    1.22.0          Upgrade complete
+4               Wed Feb  5 04:22:31 2025        superseded      nginx-13.2.13   1.23.2          Upgrade complete
+5               Wed Feb  5 04:26:06 2025        deployed        nginx-12.0.4    1.22.0          Rollback to 3   
+```
+----------
+
+## :: Kustomize
+
+----------
+
+### Kustomize Problem Statement & Ideology
+
+![kustomize_dev_stg_prod_base_overlays](kustomize_dev_stg_prod_base_overlays.png)
+
+#### Kustomize Folder Structure:
+
+![kustomize_folder_structure](kustomize_folder_structure.png)
+
+#### Why Kustomize?
+
+The key reasons to use `Kustomize` is that, it is easy to use and there is not much learning curve like the `helm` chart templating language.
+
+![kustomize_key_reasons_to_use](kustomize_key_reasons_to_use.png)
+
+------
+
+### Kustomize vs Helm
+
+
+**Kustomize vs Helm** is a common comparison when managing Kubernetes manifests. Both are tools for Kubernetes configuration management, but they have different approaches.
+
+---
+
+## **🔍 Kustomize vs Helm: Key Differences**
+| Feature           | Kustomize 🛠️ | Helm 🎩 |
+|------------------|-------------|-------------|
+| **Philosophy**  | Patch & overlay Kubernetes manifests | Package & template Kubernetes applications |
+| **Configuration Method** | Uses YAML overlays (`kustomization.yaml`) | Uses Go templating (`values.yaml`, `Chart.yaml`) |
+| **Complexity**  | Simpler, declarative | More complex, requires templating |
+| **Templating Language** | No templating, pure YAML modifications | Go-based templating language |
+| **Package Management** | Does not package resources | Packages applications into Helm charts |
+| **Reusability** | Uses overlays to modify base configurations | Uses values to customize templates |
+| **Installation** | Built into `kubectl` (`kubectl apply -k`) | Requires `helm` binary (`helm install`) |
+| **Dependency Management** | No dependency management | Supports dependencies (`requirements.yaml`) |
+| **Secrets Management** | No built-in secret management | Supports secrets via Helm plugins like Sealed Secrets or External Secrets |
+
+---
+
+## **📌 When to Use What?**
+### ✅ **Use Kustomize when:**
+- You prefer **pure YAML** (no templating logic).
+- You need **overlay-based modifications** for different environments (dev, staging, production).
+- You want to **keep configurations simple** without managing packages.
+
+### ✅ **Use Helm when:**
+- You need **application packaging & versioning**.
+- You want **templating & dynamic configuration** (e.g., reusable charts).
+- You need **dependency management** (e.g., installing Prometheus with all its sub-charts).
+
+---
+
+## **🛠️ Example Comparison**
+### **Kustomize Example**
+📌 **Base manifest (`deployment.yaml`)**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+      - name: my-app
+        image: my-app:latest
+```
+📌 **Overlay (`kustomization.yaml`)**
+```yaml
+resources:
+  - deployment.yaml
+patches:
+  - path: patch.yaml
+```
+📌 **Patch (`patch.yaml`)**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  replicas: 3
+```
+📌 **Apply with:**
+```bash
+kubectl apply -k .
+```
+
+---
+
+### **Helm Example**
+📌 **Helm Chart (`templates/deployment.yaml`)**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.appName }}
+spec:
+  replicas: {{ .Values.replicas }}
+  template:
+    spec:
+      containers:
+      - name: {{ .Values.appName }}
+        image: "{{ .Values.image }}"
+```
+📌 **Values (`values.yaml`)**
+```yaml
+appName: my-app
+replicas: 3
+image: my-app:latest
+```
+📌 **Install with:**
+```bash
+helm install my-release ./my-chart
+```
+
+## **💡 Conclusion**
+- **Kustomize** = Simple, native to Kubernetes, great for modifying existing YAML files.
+- **Helm** = More powerful, great for packaging applications with dependencies.
+
+If you’re **just modifying Kubernetes YAMLs**, go with **Kustomize**.
+If you’re **managing full application lifecycles**, go with **Helm**.
+
+-----
+
+### Install Kustomize or Setup Kustomize
+
+Prerequisites:
+
+- kubectl 
+- k8s cluster
+
+Please refer to this Installation documentation: https://kubectl.docs.kubernetes.io/installation/kustomize/binaries/.
+
+We can run this script so that, it takes care of the installation whatever the underlying OSes.
+
+```bash
+$ curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash
+```
+
+To cross-verify whether it is installed properly:
+
+```bash
+$ kustomize version --short
+```
+------
+
+### Kustomization.yaml File
+
+![example_kustomization_yaml](example_kustomization_yaml.png)
+
+Once, adding the `kustomization.yaml`, we can perform a `build` using the below command:
+
+```bash
+$ kustomize build k8s/
+```
+
+![post_build_example_kustomization_yaml](image.png)
+
+#### Important pointers:
+
+• Kustomize looks for a kustomization file which contains:
+  - List of all the Kubernetes manifests kustomize should manage
+  - All of the customizations that should be applied
+• The kustomize build command combines all the manifests and applies the defined transformations
+• The kustomize build command does not apply/deploy the Kubernetes resources to a cluster
+  - The output needs to redirected to the kubectl apply command
+
+-----
+
+### Kustomize Output
+
+```bash
+# Now, post the build, the pods/objects/resources are deployed
+$ kustomize build k8s/ | kubectl apply -f -
+
+# You can create the pods/objects/resources separately too
+$ kubectl apply -k k8s/
+
+# Deletes the pods/objects/resources
+$ kustomize build k8s/ | kubectl delete -f -
+
+# You can delete the pods/objects/resources separately too
+$ kubectl delete -f k8s/
+```
+
+------
+
+### Kustomize `apiVersion` & `kind`
+
+>[!Important]
+> Using `apiVersion` and `kind` in the `kustomization.yaml` is `optional` but, it is best to follow this approach.
+
+```yaml
+# kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# kubernetes resources to be managed by kustomize
+resources:
+  - nginx-depl.yaml
+  - nginx-service yaml
+
+#Customizations that need to be made 
+commonLabels:
+  company: KodeKloud
+```
+
+-----
+
+### Managing Directories in Kustomize
+
+
+
+
+
+
+
