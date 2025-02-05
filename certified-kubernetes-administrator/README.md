@@ -11064,7 +11064,7 @@ Once, adding the `kustomization.yaml`, we can perform a `build` using the below 
 $ kustomize build k8s/
 ```
 
-![post_build_example_kustomization_yaml](image.png)
+![post_build_example_kustomization_yaml](post_build_example_kustomization_yaml.png)
 
 #### Important pointers:
 
