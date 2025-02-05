@@ -10925,3 +10925,203 @@ The key reasons to use `Kustomize` is that, it is easy to use and there is not m
 
 ### Kustomize vs Helm
 
+
+**Kustomize vs Helm** is a common comparison when managing Kubernetes manifests. Both are tools for Kubernetes configuration management, but they have different approaches.
+
+---
+
+## **🔍 Kustomize vs Helm: Key Differences**
+| Feature           | Kustomize 🛠️ | Helm 🎩 |
+|------------------|-------------|-------------|
+| **Philosophy**  | Patch & overlay Kubernetes manifests | Package & template Kubernetes applications |
+| **Configuration Method** | Uses YAML overlays (`kustomization.yaml`) | Uses Go templating (`values.yaml`, `Chart.yaml`) |
+| **Complexity**  | Simpler, declarative | More complex, requires templating |
+| **Templating Language** | No templating, pure YAML modifications | Go-based templating language |
+| **Package Management** | Does not package resources | Packages applications into Helm charts |
+| **Reusability** | Uses overlays to modify base configurations | Uses values to customize templates |
+| **Installation** | Built into `kubectl` (`kubectl apply -k`) | Requires `helm` binary (`helm install`) |
+| **Dependency Management** | No dependency management | Supports dependencies (`requirements.yaml`) |
+| **Secrets Management** | No built-in secret management | Supports secrets via Helm plugins like Sealed Secrets or External Secrets |
+
+---
+
+## **📌 When to Use What?**
+### ✅ **Use Kustomize when:**
+- You prefer **pure YAML** (no templating logic).
+- You need **overlay-based modifications** for different environments (dev, staging, production).
+- You want to **keep configurations simple** without managing packages.
+
+### ✅ **Use Helm when:**
+- You need **application packaging & versioning**.
+- You want **templating & dynamic configuration** (e.g., reusable charts).
+- You need **dependency management** (e.g., installing Prometheus with all its sub-charts).
+
+---
+
+## **🛠️ Example Comparison**
+### **Kustomize Example**
+📌 **Base manifest (`deployment.yaml`)**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+      - name: my-app
+        image: my-app:latest
+```
+📌 **Overlay (`kustomization.yaml`)**
+```yaml
+resources:
+  - deployment.yaml
+patches:
+  - path: patch.yaml
+```
+📌 **Patch (`patch.yaml`)**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  replicas: 3
+```
+📌 **Apply with:**
+```bash
+kubectl apply -k .
+```
+
+---
+
+### **Helm Example**
+📌 **Helm Chart (`templates/deployment.yaml`)**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.appName }}
+spec:
+  replicas: {{ .Values.replicas }}
+  template:
+    spec:
+      containers:
+      - name: {{ .Values.appName }}
+        image: "{{ .Values.image }}"
+```
+📌 **Values (`values.yaml`)**
+```yaml
+appName: my-app
+replicas: 3
+image: my-app:latest
+```
+📌 **Install with:**
+```bash
+helm install my-release ./my-chart
+```
+
+## **💡 Conclusion**
+- **Kustomize** = Simple, native to Kubernetes, great for modifying existing YAML files.
+- **Helm** = More powerful, great for packaging applications with dependencies.
+
+If you’re **just modifying Kubernetes YAMLs**, go with **Kustomize**.
+If you’re **managing full application lifecycles**, go with **Helm**.
+
+-----
+
+### Install Kustomize or Setup Kustomize
+
+Prerequisites:
+
+- kubectl 
+- k8s cluster
+
+Please refer to this Installation documentation: https://kubectl.docs.kubernetes.io/installation/kustomize/binaries/.
+
+We can run this script so that, it takes care of the installation whatever the underlying OSes.
+
+```bash
+$ curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash
+```
+
+To cross-verify whether it is installed properly:
+
+```bash
+$ kustomize version --short
+```
+------
+
+### Kustomization.yaml File
+
+![example_kustomization_yaml](example_kustomization_yaml.png)
+
+Once, adding the `kustomization.yaml`, we can perform a `build` using the below command:
+
+```bash
+$ kustomize build k8s/
+```
+
+![post_build_example_kustomization_yaml](image.png)
+
+#### Important pointers:
+
+• Kustomize looks for a kustomization file which contains:
+  - List of all the Kubernetes manifests kustomize should manage
+  - All of the customizations that should be applied
+• The kustomize build command combines all the manifests and applies the defined transformations
+• The kustomize build command does not apply/deploy the Kubernetes resources to a cluster
+  - The output needs to redirected to the kubectl apply command
+
+-----
+
+### Kustomize Output
+
+```bash
+# Now, post the build, the pods/objects/resources are deployed
+$ kustomize build k8s/ | kubectl apply -f -
+
+# You can create the pods/objects/resources separately too
+$ kubectl apply -k k8s/
+
+# Deletes the pods/objects/resources
+$ kustomize build k8s/ | kubectl delete -f -
+
+# You can delete the pods/objects/resources separately too
+$ kubectl delete -f k8s/
+```
+
+------
+
+### Kustomize `apiVersion` & `kind`
+
+>[!Important]
+> Using `apiVersion` and `kind` in the `kustomization.yaml` is `optional` but, it is best to follow this approach.
+
+```yaml
+# kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# kubernetes resources to be managed by kustomize
+resources:
+  - nginx-depl.yaml
+  - nginx-service yaml
+
+#Customizations that need to be made 
+commonLabels:
+  company: KodeKloud
+```
+
+-----
+
+### Managing Directories in Kustomize
+
+
+
+
+
+
+
