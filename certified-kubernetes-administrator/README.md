@@ -11119,9 +11119,172 @@ commonLabels:
 
 ### Managing Directories in Kustomize
 
+Managing directories, multiple directories
 
+![kustomize_multiple_sub_directories](kustomize_multiple_sub_directories.png)
 
+When the resources in each subdirectories, scale more than 100 or more. It is best to have resources distributed across subdirectories along with the `kustomization.yaml` file.
 
+![kustomize_multiple_sub_directories_2](kustomize_multiple_sub_directories_2.png)
 
+In the above image, if you notice, using the multiple `kustomization.yaml` we can deploy the containers/resources without specifying all directories PATH.
 
+```bash
+$ kustomize build -f k8s/ | kubectl apply -f -
 
+or
+
+$ kubectl apply -k k8s/
+```
+##### Commands Used & Example Scenario:
+
+```bash
+ tree .
+.
+├── k8s
+│   ├── db
+│   │   ├── db-config.yaml
+│   │   ├── db-depl.yaml
+│   │   └── db-service.yaml
+│   ├── message-broker
+│   │   ├── rabbitmq-config.yaml
+│   │   ├── rabbitmq-depl.yaml
+│   │   └── rabbitmq-service.yaml
+│   └── nginx
+│       ├── nginx-depl.yaml
+│       └── nginx-service.yaml
+└── README.md
+
+4 directories, 9 files
+
+```
+
+Now, I added the `kustomization.yaml` file as well:
+
+```bash
+$ tree --filesfirst k8s/
+k8s/
+├── kustomization.yaml
+├── db
+│   ├── db-config.yaml
+│   ├── db-depl.yaml
+│   └── db-service.yaml
+├── message-broker
+│   ├── rabbitmq-config.yaml
+│   ├── rabbitmq-depl.yaml
+│   └── rabbitmq-service.yaml
+└── nginx
+    ├── nginx-depl.yaml
+    └── nginx-service.yaml
+
+3 directories, 9 files
+```
+```bash
+$ kustomize build k8s/ | kubectl apply -f -
+configmap/db-credentials created
+configmap/redis-credentials created
+service/db-service created
+service/nginx-service created
+service/rabbit-cluster-ip-service created
+deployment.apps/db-deployment created
+deployment.apps/nginx-deployment created
+deployment.apps/rabbitmq-deployment created
+
+$ kubectl get all 
+NAME                                       READY   STATUS              RESTARTS   AGE
+pod/db-deployment-856558f969-7vdjf         0/1     ContainerCreating   0          17s
+pod/nginx-deployment-6fd6985867-cb949      0/1     ContainerCreating   0          16s
+pod/nginx-deployment-6fd6985867-dg4wx      0/1     ContainerCreating   0          16s
+pod/nginx-deployment-6fd6985867-w96dq      0/1     ContainerCreating   0          17s
+pod/rabbitmq-deployment-56cbdbfd4c-pg7x6   0/1     ContainerCreating   0          17s
+
+NAME                                TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)           AGE
+service/db-service                  NodePort    10.43.41.98     <none>        27017:31352/TCP   17s
+service/kubernetes                  ClusterIP   10.43.0.1       <none>        443/TCP           64m
+service/nginx-service               NodePort    10.43.198.94    <none>        80:32267/TCP      17s
+service/rabbit-cluster-ip-service   ClusterIP   10.43.198.243   <none>        5672/TCP          17s
+
+NAME                                  READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/db-deployment         0/1     1            0           17s
+deployment.apps/nginx-deployment      0/3     3            0           17s
+deployment.apps/rabbitmq-deployment   0/1     1            0           17s
+
+NAME                                             DESIRED   CURRENT   READY   AGE
+replicaset.apps/db-deployment-856558f969         1         1         0       17s
+replicaset.apps/nginx-deployment-6fd6985867      3         3         0       17s
+replicaset.apps/rabbitmq-deployment-56cbdbfd4c   1         1         0       17s
+
+```
+
+Now, adding the `kustomization.yaml` in each subdirectories:
+
+```bash
+$ tree . --filesfirst
+.
+├── kustomization.yaml
+├── db
+│   ├── db-config.yaml
+│   ├── db-depl.yaml
+│   ├── db-service.yaml
+│   └── kustomization.yaml
+├── message-broker
+│   ├── kustomization.yaml
+│   ├── rabbitmq-config.yaml
+│   ├── rabbitmq-depl.yaml
+│   └── rabbitmq-service.yaml
+└── nginx
+    ├── kustomization.yaml
+    ├── nginx-depl.yaml
+    └── nginx-service.yaml
+
+3 directories, 12 files
+```
+
+```yaml
+# nginx/kustomization.yaml
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - nginx-depl.yaml
+  - nginx-service.yaml
+```
+
+```bash
+$ kubectl apply -k k8s/
+configmap/db-credentials created
+configmap/redis-credentials created
+service/db-service created
+service/nginx-service created
+service/rabbit-cluster-ip-service created
+deployment.apps/db-deployment created
+deployment.apps/nginx-deployment created
+deployment.apps/rabbitmq-deployment created
+
+# Let's check whether it is created:
+$ kubectl get all
+NAME                                       READY   STATUS    RESTARTS   AGE
+pod/db-deployment-856558f969-wqb9d         1/1     Running   0          2m48s
+pod/nginx-deployment-6fd6985867-fdjb8      1/1     Running   0          2m48s
+pod/nginx-deployment-6fd6985867-kmtmn      1/1     Running   0          2m48s
+pod/nginx-deployment-6fd6985867-wtq9t      1/1     Running   0          2m48s
+pod/rabbitmq-deployment-56cbdbfd4c-55qw5   1/1     Running   0          2m48s
+pod/rabbitmq-deployment-56cbdbfd4c-nl4dj   1/1     Running   0          2m48s
+
+NAME                                TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)           AGE
+service/db-service                  NodePort    10.43.71.110   <none>        27017:31079/TCP   2m48s
+service/kubernetes                  ClusterIP   10.43.0.1      <none>        443/TCP           79m
+service/nginx-service               NodePort    10.43.23.104   <none>        80:31522/TCP      2m48s
+service/rabbit-cluster-ip-service   ClusterIP   10.43.163.18   <none>        5672/TCP          2m48s
+
+NAME                                  READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/db-deployment         1/1     1            1           2m48s
+deployment.apps/nginx-deployment      3/3     3            3           2m48s
+deployment.apps/rabbitmq-deployment   2/2     2            2           2m48s
+
+NAME                                             DESIRED   CURRENT   READY   AGE
+replicaset.apps/db-deployment-856558f969         1         1         1       2m48s
+replicaset.apps/nginx-deployment-6fd6985867      3         3         3       2m48s
+replicaset.apps/rabbitmq-deployment-56cbdbfd4c   2         2         2       2m48s
+```
