@@ -11290,3 +11290,35 @@ replicaset.apps/db-deployment-856558f969         1         1         1       2m4
 replicaset.apps/nginx-deployment-6fd6985867      3         3         3       2m48s
 replicaset.apps/rabbitmq-deployment-56cbdbfd4c   2         2         2       2m48s
 ```
+
+
+-----------
+
+### Common Transformers
+
+Important documentation on Kustomize Transformers: https://github.com/kubernetes-sigs/kustomize/blob/master/examples/transformerconfigs/README.md
+
+Common Transformers available:
+
+• commonLabel - adds a label to all Kubernetes resources
+• namePrefix/Suffix - adds a common prefix-suffix to all resource names
+• Namespace - adds a common namespace to all resources
+• commonAnnotations - adds an annotation to all resources
+
+-------
+
+### Image Transformers
+
+Important documentation on Kustomize Transformers: https://github.com/kubernetes-sigs/kustomize/blob/master/examples/transformerconfigs/README.md
+
+Adding or changing the image name:
+
+![image_transformers_for_pods](image_transformers_for_pods.png)
+
+We can modify or change a tag too:
+
+![image_transformers_for_tag](image_transformers_for_tag.png)
+
+The best part is, we can modify a tag and a newName too.
+
+------
