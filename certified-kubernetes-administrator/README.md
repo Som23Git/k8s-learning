@@ -11386,3 +11386,58 @@ For detailed examples on the patches, please refer to this [Patches directory](.
 
 ### Components
 
+• Components provide the ability to define reusable pieces of configuration logic(resources + patches) that can be included in multiple overlays
+• Components are useful in situations where applications support multiple optional features that need to be enabled only in a subset of overlays
+
+![components_kustomize_kustomization_yaml](components_kustomize_kustomization_yaml.png)
+
+![components_kustomize_deployment_patch_file](components_kustomize_deployment_patch_file.png)
+
+![components_associated_with_specific_overlays](components_associated_with_specific_overlays.png)
+
+##### Commands Used & Example Scenarios
+
+```bash
+tree project_mercury/
+project_mercury/
+├── base
+│   ├── api-depl.yaml
+│   ├── api-service.yaml
+│   └── kustomization.yaml
+├── components
+│   ├── auth
+│   │   ├── api-patch.yaml
+│   │   ├── keycloak-depl.yaml
+│   │   ├── keycloak-service.yaml
+│   │   └── kustomization.yaml
+│   ├── db
+│   │   ├── api-patch.yaml
+│   │   ├── db-deployment.yaml
+│   │   ├── db-service.yaml
+│   │   └── kustomization.yaml
+│   └── logging
+│       ├── kustomization.yaml
+│       ├── prometheus-depl.yaml
+│       └── prometheus-service.yaml
+└── overlays
+    ├── community
+    │   └── kustomization.yaml
+    ├── dev
+    │   └── kustomization.yaml
+    └── enterprise
+        └── kustomization.yaml
+
+9 directories, 17 files
+```
+
+Please check this example directory as seen above to notice the configuration shared in the files: [Components Directory 1](./initial_project_mercury/) and [Components Directory 2](./final_project_mercury/)
+
+You would need to compare both the `initial_project_mercury` and `final_project_mercury` to understand its difference.
+
+----------
+
+## :: Troubleshooting
+
+----------
+
+
