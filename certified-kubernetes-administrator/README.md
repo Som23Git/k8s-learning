@@ -11322,3 +11322,67 @@ We can modify or change a tag too:
 The best part is, we can modify a tag and a newName too.
 
 ------
+
+### Patches
+
+**Example 01**
+![patch_kustomize_example_01](patch_kustomize_example_01.png)
+
+**Example 02**
+![patch_kustomize_example_02](patch_kustomize_example_02.png)
+
+##### JSON 6092 vs Strategic Merge Patch
+
+There are different types/versions of Patch
+
+![patch_kustomize_different_versions](patch_kustomize_different_versions.png)
+
+-------
+
+### Different Types of Patches
+
+- Inline Patch and Separate file Patch
+
+![inline_patch_separate_file_patch](inline_patch_separate_file_patch.png)
+
+![strategic_merge_patch_inline_separate_file_patch](strategic_merge_patch_inline_separate_file_patch.png)
+
+----- 
+
+### Patches Dictionary
+
+-----
+
+### Patches List
+
+![patches_list_delete_list_strategic_merge_patch](patches_list_delete_list_strategic_merge_patch.png)
+
+##### Commands Used & Example Scenarios
+
+```bash
+tree .
+.
+├── k8s
+│   ├── kustomization.yaml
+│   ├── mongo-depl.yaml
+│   ├── mongo-label-patch.yaml
+│   ├── mongo-service.yaml
+│   └── nginx-depl.yaml
+└── README.md
+
+1 directory, 6 files
+```
+
+For detailed examples on the patches, please refer to this [Patches directory](./example_patches_kustomize/).
+
+------
+
+### Overlays
+
+
+![overlay_base_folder_structure_example](overlay_base_folder_structure_example.png)
+
+-----
+
+### Components
+
