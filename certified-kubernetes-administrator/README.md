@@ -11138,6 +11138,8 @@ $ kubectl apply -k k8s/
 ```
 ##### Commands Used & Example Scenario:
 
+For the `complete directory and code`, refer here: [example_k8s_kustomize](./example_k8s_kustomize/)
+
 ```bash
  tree .
 .
