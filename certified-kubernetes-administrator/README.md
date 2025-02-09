@@ -10930,7 +10930,7 @@ The key reasons to use `Kustomize` is that, it is easy to use and there is not m
 
 ---
 
-## **🔍 Kustomize vs Helm: Key Differences**
+**🔍 Kustomize vs Helm: Key Differences**
 | Feature           | Kustomize 🛠️ | Helm 🎩 |
 |------------------|-------------|-------------|
 | **Philosophy**  | Patch & overlay Kubernetes manifests | Package & template Kubernetes applications |
@@ -10945,21 +10945,21 @@ The key reasons to use `Kustomize` is that, it is easy to use and there is not m
 
 ---
 
-## **📌 When to Use What?**
-### ✅ **Use Kustomize when:**
+ **📌 When to Use What?**
+ ✅ **Use Kustomize when:**
 - You prefer **pure YAML** (no templating logic).
 - You need **overlay-based modifications** for different environments (dev, staging, production).
 - You want to **keep configurations simple** without managing packages.
 
-### ✅ **Use Helm when:**
+ ✅ **Use Helm when:**
 - You need **application packaging & versioning**.
 - You want **templating & dynamic configuration** (e.g., reusable charts).
 - You need **dependency management** (e.g., installing Prometheus with all its sub-charts).
 
 ---
 
-## **🛠️ Example Comparison**
-### **Kustomize Example**
+ **🛠️ Example Comparison**
+ **Kustomize Example**
 📌 **Base manifest (`deployment.yaml`)**
 ```yaml
 apiVersion: apps/v1
@@ -10997,7 +10997,7 @@ kubectl apply -k .
 
 ---
 
-### **Helm Example**
+ **Helm Example**
 📌 **Helm Chart (`templates/deployment.yaml`)**
 ```yaml
 apiVersion: apps/v1
@@ -11023,7 +11023,7 @@ image: my-app:latest
 helm install my-release ./my-chart
 ```
 
-## **💡 Conclusion**
+ **💡 Conclusion**
 - **Kustomize** = Simple, native to Kubernetes, great for modifying existing YAML files.
 - **Helm** = More powerful, great for packaging applications with dependencies.
 
@@ -11440,4 +11440,79 @@ You would need to compare both the `initial_project_mercury` and `final_project_
 
 ----------
 
+
+### Troubleshooting Introduction
+
+- Application Failure
+- Control Plane Failure
+- Worker Node Failure
+- Network related issues
+
+------
+
+#### Application Failures
+
+Troubleshooting Applications: https://kubernetes.io/docs/tasks/debug/debug-application/
+
+
+
+```bash
+# 1
+$ kubectl get all -n gamma
+NAME                                READY   STATUS    RESTARTS   AGE
+pod/mysql                           1/1     Running   0          11s
+pod/webapp-mysql-78fd9544f6-2hdmn   1/1     Running   0          11s
+
+NAME                    TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+service/mysql-service   ClusterIP   10.43.233.98    <none>        3306/TCP         11s
+service/web-service     NodePort    10.43.208.150   <none>        8080:30081/TCP   11s
+
+NAME                           READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/webapp-mysql   1/1     1            1           11s
+
+NAME                                      DESIRED   CURRENT   READY   AGE
+replicaset.apps/webapp-mysql-78fd9544f6   1         1         1       11s
+
+# 2
+$ kubectl get all -n delta -o wide
+NAME                               READY   STATUS    RESTARTS   AGE   IP           NODE           NOMINATED NODE   READINESS GATES
+pod/mysql                          1/1     Running   0          37s   10.42.0.19   controlplane   <none>           <none>
+pod/webapp-mysql-b9c9f7fbd-mr4rl   1/1     Running   0          37s   10.42.0.20   controlplane   <none>           <none>
+
+NAME                    TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE   SELECTOR
+service/mysql-service   ClusterIP   10.43.177.42    <none>        3306/TCP         37s   name=mysql
+service/web-service     NodePort    10.43.162.188   <none>        8080:30081/TCP   37s   name=webapp-mysql
+
+NAME                           READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS     IMAGES                         SELECTOR
+deployment.apps/webapp-mysql   1/1     1            1           37s   webapp-mysql   mmumshad/simple-webapp-mysql   name=webapp-mysql
+
+NAME                                     DESIRED   CURRENT   READY   AGE   CONTAINERS     IMAGES                         SELECTOR
+replicaset.apps/webapp-mysql-b9c9f7fbd   1         1         1       37s   webapp-mysql   mmumshad/simple-webapp-mysql   name=webapp-mysql,pod-template-hash=b9c9f7fbd
+```
+
+-----
+
+### Control Plane Failure
+
+Useful commands to debug/troubleshoot:
+
+```bash
+kubectl get nodes
+kubectl get all -n kube-system
+
+# In Control plane node
+service kube-apiserver status
+service kube-controller-manager status
+service kube-scheduler status
+
+# In Worker node
+service kubelet status
+service kube-proxy status
+
+# check service logs
+kubectl logs kube-apiserver-master -n kube-system
+sudo journalctl -u kube-apiserver
+```
+
+Troubleshooting Clusters: https://kubernetes.io/docs/tasks/debug/debug-cluster/
 
