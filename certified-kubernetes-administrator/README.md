@@ -11516,3 +11516,4 @@ sudo journalctl -u kube-apiserver
 
 Troubleshooting Clusters: https://kubernetes.io/docs/tasks/debug/debug-cluster/
 
+eiap_couchbase_flna_dtc_prod-logs
