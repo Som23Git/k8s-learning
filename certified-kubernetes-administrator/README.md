@@ -10930,7 +10930,7 @@ The key reasons to use `Kustomize` is that, it is easy to use and there is not m
 
 ---
 
-## **🔍 Kustomize vs Helm: Key Differences**
+**🔍 Kustomize vs Helm: Key Differences**
 | Feature           | Kustomize 🛠️ | Helm 🎩 |
 |------------------|-------------|-------------|
 | **Philosophy**  | Patch & overlay Kubernetes manifests | Package & template Kubernetes applications |
@@ -10945,21 +10945,21 @@ The key reasons to use `Kustomize` is that, it is easy to use and there is not m
 
 ---
 
-## **📌 When to Use What?**
-### ✅ **Use Kustomize when:**
+ **📌 When to Use What?**
+ ✅ **Use Kustomize when:**
 - You prefer **pure YAML** (no templating logic).
 - You need **overlay-based modifications** for different environments (dev, staging, production).
 - You want to **keep configurations simple** without managing packages.
 
-### ✅ **Use Helm when:**
+ ✅ **Use Helm when:**
 - You need **application packaging & versioning**.
 - You want **templating & dynamic configuration** (e.g., reusable charts).
 - You need **dependency management** (e.g., installing Prometheus with all its sub-charts).
 
 ---
 
-## **🛠️ Example Comparison**
-### **Kustomize Example**
+ **🛠️ Example Comparison**
+ **Kustomize Example**
 📌 **Base manifest (`deployment.yaml`)**
 ```yaml
 apiVersion: apps/v1
@@ -10997,7 +10997,7 @@ kubectl apply -k .
 
 ---
 
-### **Helm Example**
+ **Helm Example**
 📌 **Helm Chart (`templates/deployment.yaml`)**
 ```yaml
 apiVersion: apps/v1
@@ -11023,7 +11023,7 @@ image: my-app:latest
 helm install my-release ./my-chart
 ```
 
-## **💡 Conclusion**
+ **💡 Conclusion**
 - **Kustomize** = Simple, native to Kubernetes, great for modifying existing YAML files.
 - **Helm** = More powerful, great for packaging applications with dependencies.
 
@@ -11119,9 +11119,401 @@ commonLabels:
 
 ### Managing Directories in Kustomize
 
+Managing directories, multiple directories
+
+![kustomize_multiple_sub_directories](kustomize_multiple_sub_directories.png)
+
+When the resources in each subdirectories, scale more than 100 or more. It is best to have resources distributed across subdirectories along with the `kustomization.yaml` file.
+
+![kustomize_multiple_sub_directories_2](kustomize_multiple_sub_directories_2.png)
+
+In the above image, if you notice, using the multiple `kustomization.yaml` we can deploy the containers/resources without specifying all directories PATH.
+
+```bash
+$ kustomize build -f k8s/ | kubectl apply -f -
+
+or
+
+$ kubectl apply -k k8s/
+```
+##### Commands Used & Example Scenario:
+
+For the `complete directory and code`, refer here: [example_k8s_kustomize](./example_k8s_kustomize/)
+
+```bash
+ tree .
+.
+├── k8s
+│   ├── db
+│   │   ├── db-config.yaml
+│   │   ├── db-depl.yaml
+│   │   └── db-service.yaml
+│   ├── message-broker
+│   │   ├── rabbitmq-config.yaml
+│   │   ├── rabbitmq-depl.yaml
+│   │   └── rabbitmq-service.yaml
+│   └── nginx
+│       ├── nginx-depl.yaml
+│       └── nginx-service.yaml
+└── README.md
+
+4 directories, 9 files
+
+```
+
+Now, I added the `kustomization.yaml` file as well:
+
+```bash
+$ tree --filesfirst k8s/
+k8s/
+├── kustomization.yaml
+├── db
+│   ├── db-config.yaml
+│   ├── db-depl.yaml
+│   └── db-service.yaml
+├── message-broker
+│   ├── rabbitmq-config.yaml
+│   ├── rabbitmq-depl.yaml
+│   └── rabbitmq-service.yaml
+└── nginx
+    ├── nginx-depl.yaml
+    └── nginx-service.yaml
+
+3 directories, 9 files
+```
+```bash
+$ kustomize build k8s/ | kubectl apply -f -
+configmap/db-credentials created
+configmap/redis-credentials created
+service/db-service created
+service/nginx-service created
+service/rabbit-cluster-ip-service created
+deployment.apps/db-deployment created
+deployment.apps/nginx-deployment created
+deployment.apps/rabbitmq-deployment created
+
+$ kubectl get all 
+NAME                                       READY   STATUS              RESTARTS   AGE
+pod/db-deployment-856558f969-7vdjf         0/1     ContainerCreating   0          17s
+pod/nginx-deployment-6fd6985867-cb949      0/1     ContainerCreating   0          16s
+pod/nginx-deployment-6fd6985867-dg4wx      0/1     ContainerCreating   0          16s
+pod/nginx-deployment-6fd6985867-w96dq      0/1     ContainerCreating   0          17s
+pod/rabbitmq-deployment-56cbdbfd4c-pg7x6   0/1     ContainerCreating   0          17s
+
+NAME                                TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)           AGE
+service/db-service                  NodePort    10.43.41.98     <none>        27017:31352/TCP   17s
+service/kubernetes                  ClusterIP   10.43.0.1       <none>        443/TCP           64m
+service/nginx-service               NodePort    10.43.198.94    <none>        80:32267/TCP      17s
+service/rabbit-cluster-ip-service   ClusterIP   10.43.198.243   <none>        5672/TCP          17s
+
+NAME                                  READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/db-deployment         0/1     1            0           17s
+deployment.apps/nginx-deployment      0/3     3            0           17s
+deployment.apps/rabbitmq-deployment   0/1     1            0           17s
+
+NAME                                             DESIRED   CURRENT   READY   AGE
+replicaset.apps/db-deployment-856558f969         1         1         0       17s
+replicaset.apps/nginx-deployment-6fd6985867      3         3         0       17s
+replicaset.apps/rabbitmq-deployment-56cbdbfd4c   1         1         0       17s
+
+```
+
+Now, adding the `kustomization.yaml` in each subdirectories:
+
+```bash
+$ tree . --filesfirst
+.
+├── kustomization.yaml
+├── db
+│   ├── db-config.yaml
+│   ├── db-depl.yaml
+│   ├── db-service.yaml
+│   └── kustomization.yaml
+├── message-broker
+│   ├── kustomization.yaml
+│   ├── rabbitmq-config.yaml
+│   ├── rabbitmq-depl.yaml
+│   └── rabbitmq-service.yaml
+└── nginx
+    ├── kustomization.yaml
+    ├── nginx-depl.yaml
+    └── nginx-service.yaml
+
+3 directories, 12 files
+```
+
+```yaml
+# nginx/kustomization.yaml
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - nginx-depl.yaml
+  - nginx-service.yaml
+```
+
+```bash
+$ kubectl apply -k k8s/
+configmap/db-credentials created
+configmap/redis-credentials created
+service/db-service created
+service/nginx-service created
+service/rabbit-cluster-ip-service created
+deployment.apps/db-deployment created
+deployment.apps/nginx-deployment created
+deployment.apps/rabbitmq-deployment created
+
+# Let's check whether it is created:
+$ kubectl get all
+NAME                                       READY   STATUS    RESTARTS   AGE
+pod/db-deployment-856558f969-wqb9d         1/1     Running   0          2m48s
+pod/nginx-deployment-6fd6985867-fdjb8      1/1     Running   0          2m48s
+pod/nginx-deployment-6fd6985867-kmtmn      1/1     Running   0          2m48s
+pod/nginx-deployment-6fd6985867-wtq9t      1/1     Running   0          2m48s
+pod/rabbitmq-deployment-56cbdbfd4c-55qw5   1/1     Running   0          2m48s
+pod/rabbitmq-deployment-56cbdbfd4c-nl4dj   1/1     Running   0          2m48s
+
+NAME                                TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)           AGE
+service/db-service                  NodePort    10.43.71.110   <none>        27017:31079/TCP   2m48s
+service/kubernetes                  ClusterIP   10.43.0.1      <none>        443/TCP           79m
+service/nginx-service               NodePort    10.43.23.104   <none>        80:31522/TCP      2m48s
+service/rabbit-cluster-ip-service   ClusterIP   10.43.163.18   <none>        5672/TCP          2m48s
+
+NAME                                  READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/db-deployment         1/1     1            1           2m48s
+deployment.apps/nginx-deployment      3/3     3            3           2m48s
+deployment.apps/rabbitmq-deployment   2/2     2            2           2m48s
+
+NAME                                             DESIRED   CURRENT   READY   AGE
+replicaset.apps/db-deployment-856558f969         1         1         1       2m48s
+replicaset.apps/nginx-deployment-6fd6985867      3         3         3       2m48s
+replicaset.apps/rabbitmq-deployment-56cbdbfd4c   2         2         2       2m48s
+```
+
+
+-----------
+
+### Common Transformers
+
+Important documentation on Kustomize Transformers: https://github.com/kubernetes-sigs/kustomize/blob/master/examples/transformerconfigs/README.md
+
+Common Transformers available:
+
+• commonLabel - adds a label to all Kubernetes resources
+• namePrefix/Suffix - adds a common prefix-suffix to all resource names
+• Namespace - adds a common namespace to all resources
+• commonAnnotations - adds an annotation to all resources
+
+-------
+
+### Image Transformers
+
+Important documentation on Kustomize Transformers: https://github.com/kubernetes-sigs/kustomize/blob/master/examples/transformerconfigs/README.md
+
+Adding or changing the image name:
+
+![image_transformers_for_pods](image_transformers_for_pods.png)
+
+We can modify or change a tag too:
+
+![image_transformers_for_tag](image_transformers_for_tag.png)
+
+The best part is, we can modify a tag and a newName too.
+
+------
+
+### Patches
+
+**Example 01**
+![patch_kustomize_example_01](patch_kustomize_example_01.png)
+
+**Example 02**
+![patch_kustomize_example_02](patch_kustomize_example_02.png)
+
+##### JSON 6092 vs Strategic Merge Patch
+
+There are different types/versions of Patch
+
+![patch_kustomize_different_versions](patch_kustomize_different_versions.png)
+
+-------
+
+### Different Types of Patches
+
+- Inline Patch and Separate file Patch
+
+![inline_patch_separate_file_patch](inline_patch_separate_file_patch.png)
+
+![strategic_merge_patch_inline_separate_file_patch](strategic_merge_patch_inline_separate_file_patch.png)
+
+----- 
+
+### Patches Dictionary
+
+-----
+
+### Patches List
+
+![patches_list_delete_list_strategic_merge_patch](patches_list_delete_list_strategic_merge_patch.png)
+
+##### Commands Used & Example Scenarios
+
+```bash
+tree .
+.
+├── k8s
+│   ├── kustomization.yaml
+│   ├── mongo-depl.yaml
+│   ├── mongo-label-patch.yaml
+│   ├── mongo-service.yaml
+│   └── nginx-depl.yaml
+└── README.md
+
+1 directory, 6 files
+```
+
+For detailed examples on the patches, please refer to this [Patches directory](./example_patches_kustomize/).
+
+------
+
+### Overlays
+
+
+![overlay_base_folder_structure_example](overlay_base_folder_structure_example.png)
+
+-----
+
+### Components
+
+• Components provide the ability to define reusable pieces of configuration logic(resources + patches) that can be included in multiple overlays
+• Components are useful in situations where applications support multiple optional features that need to be enabled only in a subset of overlays
+
+![components_kustomize_kustomization_yaml](components_kustomize_kustomization_yaml.png)
+
+![components_kustomize_deployment_patch_file](components_kustomize_deployment_patch_file.png)
+
+![components_associated_with_specific_overlays](components_associated_with_specific_overlays.png)
+
+##### Commands Used & Example Scenarios
+
+```bash
+tree project_mercury/
+project_mercury/
+├── base
+│   ├── api-depl.yaml
+│   ├── api-service.yaml
+│   └── kustomization.yaml
+├── components
+│   ├── auth
+│   │   ├── api-patch.yaml
+│   │   ├── keycloak-depl.yaml
+│   │   ├── keycloak-service.yaml
+│   │   └── kustomization.yaml
+│   ├── db
+│   │   ├── api-patch.yaml
+│   │   ├── db-deployment.yaml
+│   │   ├── db-service.yaml
+│   │   └── kustomization.yaml
+│   └── logging
+│       ├── kustomization.yaml
+│       ├── prometheus-depl.yaml
+│       └── prometheus-service.yaml
+└── overlays
+    ├── community
+    │   └── kustomization.yaml
+    ├── dev
+    │   └── kustomization.yaml
+    └── enterprise
+        └── kustomization.yaml
+
+9 directories, 17 files
+```
+
+Please check this example directory as seen above to notice the configuration shared in the files: [Components Directory 1](./initial_project_mercury/) and [Components Directory 2](./final_project_mercury/)
+
+You would need to compare both the `initial_project_mercury` and `final_project_mercury` to understand its difference.
+
+----------
+
+## :: Troubleshooting
+
+----------
+
+
+### Troubleshooting Introduction
+
+- Application Failure
+- Control Plane Failure
+- Worker Node Failure
+- Network related issues
+
+------
+
+#### Application Failures
+
+Troubleshooting Applications: https://kubernetes.io/docs/tasks/debug/debug-application/
 
 
 
+```bash
+# 1
+$ kubectl get all -n gamma
+NAME                                READY   STATUS    RESTARTS   AGE
+pod/mysql                           1/1     Running   0          11s
+pod/webapp-mysql-78fd9544f6-2hdmn   1/1     Running   0          11s
 
+NAME                    TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+service/mysql-service   ClusterIP   10.43.233.98    <none>        3306/TCP         11s
+service/web-service     NodePort    10.43.208.150   <none>        8080:30081/TCP   11s
 
+NAME                           READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/webapp-mysql   1/1     1            1           11s
 
+NAME                                      DESIRED   CURRENT   READY   AGE
+replicaset.apps/webapp-mysql-78fd9544f6   1         1         1       11s
+
+# 2
+$ kubectl get all -n delta -o wide
+NAME                               READY   STATUS    RESTARTS   AGE   IP           NODE           NOMINATED NODE   READINESS GATES
+pod/mysql                          1/1     Running   0          37s   10.42.0.19   controlplane   <none>           <none>
+pod/webapp-mysql-b9c9f7fbd-mr4rl   1/1     Running   0          37s   10.42.0.20   controlplane   <none>           <none>
+
+NAME                    TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE   SELECTOR
+service/mysql-service   ClusterIP   10.43.177.42    <none>        3306/TCP         37s   name=mysql
+service/web-service     NodePort    10.43.162.188   <none>        8080:30081/TCP   37s   name=webapp-mysql
+
+NAME                           READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS     IMAGES                         SELECTOR
+deployment.apps/webapp-mysql   1/1     1            1           37s   webapp-mysql   mmumshad/simple-webapp-mysql   name=webapp-mysql
+
+NAME                                     DESIRED   CURRENT   READY   AGE   CONTAINERS     IMAGES                         SELECTOR
+replicaset.apps/webapp-mysql-b9c9f7fbd   1         1         1       37s   webapp-mysql   mmumshad/simple-webapp-mysql   name=webapp-mysql,pod-template-hash=b9c9f7fbd
+```
+
+-----
+
+### Control Plane Failure
+
+Useful commands to debug/troubleshoot:
+
+```bash
+kubectl get nodes
+kubectl get all -n kube-system
+
+# In Control plane node
+service kube-apiserver status
+service kube-controller-manager status
+service kube-scheduler status
+
+# In Worker node
+service kubelet status
+service kube-proxy status
+
+# check service logs
+kubectl logs kube-apiserver-master -n kube-system
+sudo journalctl -u kube-apiserver
+```
+
+Troubleshooting Clusters: https://kubernetes.io/docs/tasks/debug/debug-cluster/
+
+eiap_couchbase_flna_dtc_prod-logs
